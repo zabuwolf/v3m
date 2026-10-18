@@ -21,7 +21,7 @@
     if (!$('#settings-panel').hidden && reason === 'settings') { /* panel tự vẽ lại */ }
     Office._blinkCache = null;
   });
-  if (!Store.online) UI.toast('Đang chạy ngoại tuyến: dữ liệu lưu trong trình duyệt. Chạy server.py để lưu tập trung.', 'warn');
+  if (!Store.online) UI.toast('Bản web tĩnh: thay đổi chỉ lưu trong trình duyệt này. Chạy server.py để lưu tập trung.', 'warn');
 
   // Tự động trình chiếu đúng giờ đã đặt (ví dụ 16:30) nếu đang ở màn văn phòng
   let lastFired = '';

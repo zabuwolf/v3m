@@ -21,6 +21,14 @@ Lần chạy đầu server tự sinh dữ liệu mẫu vào `data/db.json`. Mọ
 lưu ngay vào file này. Mở thẳng `web/index.html` không qua server cũng chạy được (chế độ
 ngoại tuyến, lưu trong trình duyệt).
 
+## Đưa lên Vercel / hosting tĩnh
+
+Vercel không chạy `server.py` (không có tiến trình nền, không ghi được file). File `vercel.json`
+đã trỏ *Output Directory* vào `web/`, nên khi nối repo với Vercel trang sẽ chạy ở **chế độ tĩnh**:
+dữ liệu mẫu nạp từ `web/js/seed.js`, mọi thay đổi chỉ lưu trong trình duyệt của từng người
+(localStorage). Muốn nhiều người dùng chung một dữ liệu thì chạy `server.py` trên một máy chủ
+thật (VPS, Render, Railway, Fly.io…) hoặc máy trong văn phòng.
+
 ## Các màn hình
 
 | Màn | Nội dung |
