@@ -1,0 +1,4 @@
+__pycache__/
+data/db.json
+data/db.json.tmp
+*.log

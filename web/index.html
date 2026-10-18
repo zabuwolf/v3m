@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>V3M HR Office</title>
+<link rel="stylesheet" href="css/style.css">
+<script>window.__errors=[];window.addEventListener("error",e=>{window.__errors.push(e.message+" @"+(e.filename||"").split("/").pop()+":"+e.lineno);document.body&&(document.body.dataset.errors=JSON.stringify(window.__errors));});window.addEventListener("unhandledrejection",e=>{window.__errors.push("promise: "+(e.reason&&e.reason.message||e.reason));document.body&&(document.body.dataset.errors=JSON.stringify(window.__errors));});</script>
+</head>
+<body>
+<header id="topbar">
+  <div class="logo"><b id="logo-text">V3M</b><small id="logo-sub">HR OFFICE</small></div>
+  <nav id="tabs">
+    <button data-view="office" class="active">Văn phòng 3D</button>
+    <button data-view="manage">Quản lý nhân sự</button>
+    <button data-view="reports">Báo cáo</button>
+  </nav>
+  <div class="right">
+    <span id="saved-dot" class="saved">✓ đã lưu</span>
+    <span id="conn-dot" class="dot off" title=""></span>
+    <button id="btn-chat" class="ic" title="Lễ tân">💬</button>
+    <button id="btn-bell" class="ic" title="Cần xử lý">🔔<span id="bell-count" class="badge" hidden>0</span></button>
+  </div>
+</header>
+
+<main>
+  <section id="view-office">
+    <canvas id="office"></canvas>
+    <div id="hover-card" hidden></div>
+    <div id="zoom-ctrls"><button id="zoom-in">+</button><button id="zoom-out">−</button><button id="zoom-fit" title="Toàn cảnh">⌂</button></div>
+    <button id="btn-settings" title="Cài đặt văn phòng">⚙</button>
+    <button id="btn-tour" title="Trình chiếu">🎬 Tham quan</button>
+    <div id="settings-panel" hidden></div>
+
+    <div id="tour-overlay" hidden>
+      <div class="tour-top">
+        <div class="tour-logo" id="tour-logo">HR</div>
+        <div class="tour-head"><b id="tour-title">Tham quan khu</b><small id="tour-sub"></small></div>
+        <div class="tour-btns"><button id="tour-prev">‹</button><button id="tour-pause">⏸</button><button id="tour-next">›</button><button id="tour-sound">🔊</button><button id="tour-report">📊</button><button id="tour-close">✕</button></div>
+        <div class="tour-bar"><div id="tour-progress"></div></div>
+      </div>
+      <div id="tour-card" class="tour-card"></div>
+    </div>
+  </section>
+
+  <section id="view-manage" hidden></section>
+  <section id="view-reports" hidden></section>
+</main>
+
+<div id="modal" hidden><div class="modal-box"></div></div>
+<div id="toasts"></div>
+
+<script src="js/seed.js"></script>
+<script src="js/store.js"></script>
+<script src="js/office.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/tour.js"></script>
+<script src="js/manage.js"></script>
+<script src="js/reports.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
