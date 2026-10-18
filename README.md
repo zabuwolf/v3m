@@ -1,84 +1,67 @@
-# V3M HR Office – Văn phòng ảo 3D quản lý nhân sự
+# V3M HR Office – Văn phòng ảo 3D & Quản lý nhân sự (React + TypeScript)
 
-Hệ thống quản lý nhân sự theo phong cách "văn phòng ảo isometric" (mô phỏng theo video
-`vid hệ thống.mp4` – KBT Agent Office): toàn bộ nhân viên, tổ, phòng ban hiện trên một
-sơ đồ văn phòng 3D; số liệu chấm công, công việc, KPI được chiếu tự động như bản tin nội bộ.
+Hệ thống quản lý nhân sự theo phong cách **văn phòng ảo isometric 3D** hiện đại (phỏng theo KBT Agent Office): toàn bộ nhân viên, tổ nhóm, phòng ban hiển thị trên một mô hình văn phòng 3D tương tác sống động; số liệu chấm công, công việc, KPI được trình chiếu tự động như bản tin nội bộ.
 
-## Chạy
+Dự án đã được chuyển đổi hoàn toàn sang **React + TypeScript + Vite + Tailwind CSS** với đồ hoạ isometric trau chuốt, hỗ trợ render sub-pixel sắc nét trên màn hình Retina / High-DPI, đèn chiếu sáng ngày/đêm chân thực, các phụ kiện văn phòng và cây xanh đa dạng.
 
-Chỉ cần Python 3 (không cài thêm gì):
+---
+
+## Tính năng chính
+
+### 1. 🏢 Văn phòng ảo 3D Isometric & Assets nâng cao
+- **7 Phân khu chức năng**: Phòng điều hành, Leader Hub, Phòng Nhân sự, Phòng Kinh doanh, Phòng Kỹ thuật, Marketing & Creative, Sảnh Lễ tân & Café.
+- **Nội thất & Assets trau chuốt**:
+  - Bàn làm việc công thái học với màn hình cong đôi phát sáng theo màu nhận diện của tổ, bàn phím cơ, chuột, đèn bàn góc chiếu mềm.
+  - Phòng điều hành với tủ sách gỗ sồi, tài liệu, cúp vinh danh, ghế sofa bọc da cao cấp.
+  - Phòng kỹ thuật & Leader Hub với tủ Server rack chứa đèn LED nhấp nháy liên tục, bảng tương tác kỹ thuật số với biểu đồ sóng chuyển động thời gian thực.
+  - Sảnh lễ tân hiện đại với quầy đá uốn cong "LỄ TÂN · RECEPTION", máy pha cà phê espresso bốc khói hơi nước bồng bềnh, bàn ghế lounge thư giãn.
+  - Cây xanh Monstera & vạn niên thanh tỉa lá nhiều lớp sinh động.
+- **Trang trí lễ hội**:
+  - **Tết**: Lồng đèn đỏ phát sáng, cành đào hồng nở rộ.
+  - **Noel**: Cây thông mini lung linh, nơ chuông giáng sinh.
+  - **Tiêu chuẩn**: Phong cách kiến trúc tối giản hiện đại.
+- **Nhân vật & Nhân viên 3D**:
+  - Avatar pixel/isometric đa dạng kiểu tóc (ngắn, dài xoăn, búi cao, dựng phong cách), trang phục màu tổ công tác, phụ kiện mắt kính, vương miện cho Trưởng tổ / Leader.
+  - Hiệu ứng thở nhẹ nhàng, bóng đổ mềm mại, đèn cảnh báo nhấp nháy phát xung tròn dưới sàn bàn làm việc.
+  - Bong bóng hội thoại (Chatter) ngẫu nhiên giữa các nhân viên trong giờ làm việc.
+  - Bảng tên nổi hiển thị tên và chấm trạng thái: 🟢 Có mặt, 🟡 Đi muộn, 🔵 Làm từ xa, ⚪ Vắng mặt.
+
+### 2. 🎬 Chế độ Tham Quan & Trình Chiếu (Tour Presentation)
+- Trình chiếu tự động các slide giới thiệu: Khởi động → 7 khu vực phòng ban → Sảnh lễ tân & Café đối thoại phục vụ khách → Quy tắc cảnh báo nhấp nháy → Báo cáo tổng quan → **Bục vinh danh Top 3 kèm pháo hoa Confetti rực rỡ và tiếng chuông reo** → Quán quân kỳ → Tổ cần hỗ trợ → Top gương mặt nhân sự 90 ngày.
+- Thanh tiến trình, nút lùi / tạm dừng / tiến, bật/tắt âm thanh hiệu ứng Web Audio API.
+
+### 3. 👥 Quản lý nhân sự toàn diện
+- **Tổng quan**: Số liệu thống kê thời gian thực, bảng xếp hạng tổ, danh sách nhân viên chưa check-in kèm nút check-in nhanh.
+- **Nhân sự**: Tìm kiếm tức thì, lọc theo phòng ban, thêm/sửa/xoá nhân viên, xem hồ sơ cá nhân và xuất file CSV.
+- **Phòng ban & Tổ**: Quản lý các tổ chuyên môn, chỉnh sửa tên, màu nhận diện và thông tin phòng ban.
+- **Chấm công**: Lịch chấm công theo ngày, ghi nhận giờ vào / giờ ra, tự động tính tăng ca (OT), số lượng việc hoàn thành và chấm điểm KPI. Nút "Tất cả có mặt" tiện lợi.
+- **Nghỉ phép**: Tiếp nhận đơn xin nghỉ (phép năm, ốm, thai sản, việc riêng), phê duyệt hoặc từ chối, tự động đồng bộ sang lịch chấm công.
+- **Công việc (Kanban)**: 3 cột Cần làm - Đang làm - Đã xong, chỉ báo việc quá hạn, ưu tiên gấp, kéo chuyển trạng thái mượt mà.
+- **Tuyển dụng**: Pipeline ứng viên (Mới nộp → Sàng lọc → Phỏng vấn → Đề nghị → Đã nhận), nút "Nhận việc" tạo ngay hồ sơ nhân viên vào tổ.
+- **Khách mời**: Sổ theo dõi khách mời ghé thăm văn phòng, hiển thị tại khu vực lễ tân.
+- **Dữ liệu & Quy tắc**: Tuỳ chỉnh ngưỡng cảnh báo (đi muộn, chuyên cần, việc, KPI, số ngày đánh giá), sao lưu dữ liệu ra file JSON, nhập JSON và khôi phục dữ liệu ban đầu.
+
+### 4. 📊 Báo cáo & Vinh danh
+- Bộ lọc thời gian: Hôm nay, Hôm qua, Tuần này, Tháng này.
+- Thẻ Quán quân kỳ với các thành viên tiêu biểu.
+- Bục vinh danh Top 3 tổ chuyên môn.
+- Biểu đồ cột thể hiện chuyên cần và tỷ lệ đi muộn trong 14 ngày gần nhất.
+- Bảng xếp hạng chi tiết tất cả các tổ và Top gương mặt nhân sự 90 ngày.
+
+---
+
+## Khởi chạy dự án
 
 ```bash
-cd /home/zabu/V3M
-python3 server.py          # cổng mặc định 8787
-# python3 server.py 9000   # đổi cổng
+# Cài đặt thư viện
+npm install
+
+# Chạy môi trường phát triển (Port 3000)
+npm run dev
+
+# Đóng gói sản phẩm
+npm run build
 ```
 
-Mở `http://localhost:8787`. Server in ra cả địa chỉ LAN (ví dụ `http://192.168.1.10:8787`)
-để mở trên điện thoại cùng Wi-Fi, giống trong video.
-
-Lần chạy đầu server tự sinh dữ liệu mẫu vào `data/db.json`. Mọi thay đổi trên giao diện được
-lưu ngay vào file này. Mở thẳng `web/index.html` không qua server cũng chạy được (chế độ
-ngoại tuyến, lưu trong trình duyệt).
-
-## Đưa lên Vercel / hosting tĩnh
-
-Vercel không chạy `server.py` (không có tiến trình nền, không ghi được file). File `vercel.json`
-đã trỏ *Output Directory* vào `web/`, nên khi nối repo với Vercel trang sẽ chạy ở **chế độ tĩnh**:
-dữ liệu mẫu nạp từ `web/js/seed.js`, mọi thay đổi chỉ lưu trong trình duyệt của từng người
-(localStorage). Muốn nhiều người dùng chung một dữ liệu thì chạy `server.py` trên một máy chủ
-thật (VPS, Render, Railway, Fly.io…) hoặc máy trong văn phòng.
-
-## Các màn hình
-
-| Màn | Nội dung |
-|---|---|
-| **Văn phòng 3D** | Sơ đồ isometric 7 khu: Phòng điều hành, Leader Hub, Nhân sự, Kinh doanh, Kỹ thuật, Marketing & Creative, Sảnh lễ tân & Café. Avatar nhân viên ngồi theo bàn, trợ lý AI, đường kết nối ra lệnh / báo cáo, bảng tên có chấm trạng thái (có mặt / muộn / từ xa / nghỉ), nhấp nháy đỏ / vàng theo quy tắc, ngày / đêm theo giờ thực, theme Tết / Noel. Kéo để di chuyển, cuộn hoặc chụm để phóng to. Bấm nhân vật để mở hồ sơ, bấm nhãn khu để xem thẻ khu vực. |
-| **🎬 Tham quan** | Trình chiếu tự động ~36 slide: Mở màn → 7 khu vực → Lễ tân đón khách (chat) → Quy tắc nhấp nháy → Tổng quan / Vinh danh (bục top 3 + confetti) / Quán quân / Kém nhất cho Hôm nay, Hôm qua, Tuần này, Tháng này → Nhắc nhở các tổ bị cảnh báo → Hồ sơ nhân sự nổi bật. Phím ← → để chuyển, Esc để thoát, vuốt trên điện thoại. Tự bật đúng giờ đã đặt (mặc định 16:30). |
-| **⚙ Cài đặt văn phòng** | Tìm nhân viên, thêm bàn, sắp xếp bàn, lưới, kết nối, bảng tên, ngày / đêm, đèn, theme, lịch chiếu, giây / slide, link chiếu, chú giải sơ đồ. |
-| **Quản lý nhân sự** | Tổng quan · Nhân sự (thêm / sửa / xoá, tìm kiếm, xuất CSV) · Phòng ban & Tổ · Chấm công (theo ngày, check-in / out, OT, việc, KPI) · Nghỉ phép (tạo, duyệt, từ chối) · Công việc (kanban) · Tuyển dụng (pipeline, nhận việc → tạo hồ sơ) · Khách mời · Dữ liệu & quy tắc (ngưỡng cảnh báo, xuất / nhập JSON, sinh lại dữ liệu mẫu). |
-| **Báo cáo** | Tổng quan theo kỳ, quán quân, bục vinh danh, kém nhất, biểu đồ có mặt 14 ngày, bảng xếp hạng tổ, top nhân sự 90 ngày, cảnh báo. |
-
-## Quy tắc nhấp nháy (chỉnh trong *Dữ liệu & quy tắc*)
-
-Trong cửa sổ 30 ngày, một tổ bị **cảnh báo** khi: đi muộn > 15 %, chuyên cần < 90 %,
-hoàn thành việc < 80 %, hoặc KPI < 60.
-
-- 🔴 **Nháy đỏ · xử lý ngay**: từ 2 cảnh báo trở lên.
-- 🟡 **Nháy vàng · kém nhất kỳ**: tổ có KPI thấp nhất trong kỳ đang chiếu.
-- ⚠ **Nhắc nhở**: 1 cảnh báo, theo dõi.
-
-## Tham số URL hữu ích
-
-| URL | Tác dụng |
-|---|---|
-| `/?tour=1` | Mở trình chiếu ngay (dán lên TV / màn hình sảnh) |
-| `/?slide=11` | Mở trình chiếu từ slide số 11 |
-| `/?view=manage&tab=attendance` | Vào thẳng tab chấm công (`employees`, `teams`, `leaves`, `tasks`, `candidates`, `visitors`, `data`) |
-| `/?view=reports&period=week` | Báo cáo tuần (`today`, `yesterday`, `week`, `month`) |
-| `/?emp=nv011` | Mở hồ sơ một nhân viên |
-| `/?night=1` | Ép chế độ đêm để xem đèn |
-
-## Cấu trúc
-
-```
-server.py        máy chủ HTTP + API (GET/PUT /api/data, POST /api/reset)
-seed.py          sinh dữ liệu mẫu: data/seed.json và web/js/seed.js
-data/db.json     cơ sở dữ liệu thực (tự tạo)
-web/index.html   giao diện
-web/css/style.css
-web/js/store.js  tải / lưu dữ liệu, tính KPI, chuyên cần, xếp hạng, cảnh báo
-web/js/office.js vẽ văn phòng isometric trên canvas, camera, tương tác
-web/js/ui.js     thẻ thông tin, popup hồ sơ, bảng cài đặt, toast
-web/js/tour.js   chế độ tham quan / trình chiếu
-web/js/manage.js trang quản lý nhân sự (CRUD)
-web/js/reports.js trang báo cáo
-web/js/app.js    khởi động, tham số URL, tự chiếu theo giờ
-```
-
-## Dữ liệu
-
-`data/db.json` là một tài liệu JSON duy nhất gồm: `company`, `settings`, `zones`, `teams`,
-`employees`, `agents`, `attendance` (một bản ghi / người / ngày), `tasks`, `leaves`,
-`candidates`, `visitors`, `rules`. Có thể xuất / nhập toàn bộ ở tab *Dữ liệu & quy tắc*.
-Muốn bắt đầu với dữ liệu thật: xoá hết nhân viên mẫu hoặc nhập file JSON theo cùng cấu trúc.
+Mở trình duyệt tại `http://localhost:3000`.
+Thêm tham số `?tour=1` vào URL để tự động mở chế độ trình chiếu lên TV hoặc màn hình sảnh đón tiếp.

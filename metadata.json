@@ -1,0 +1,8 @@
+{
+  "name": "V3M HR Office - Văn Phòng 3D & Quản Lý Nhân Sự",
+  "description": "Văn phòng 3D isometric tương tác, trình chiếu tham quan khu, quản lý nhân sự, chấm công KPI, công việc và báo cáo vinh danh.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
