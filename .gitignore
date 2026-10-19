@@ -2,3 +2,9 @@ __pycache__/
 data/db.json
 data/db.json.tmp
 *.log
+node_modules/
+dist/
+.vite/
+
+# Hồ sơ gốc có CCCD, tài khoản ngân hàng và địa chỉ — không đưa lên git
+VIC.THÔNG TIN NHÂN SỰ.xlsx

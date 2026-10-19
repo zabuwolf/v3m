@@ -46,7 +46,7 @@ export const OfficeSettings: React.FC<OfficeSettingsProps> = ({
   };
 
   return (
-    <div className="absolute top-16 right-4 z-40 w-84 max-h-[calc(100vh-80px)] overflow-y-auto rounded-2xl bg-slate-900/95 backdrop-blur-xl border border-slate-700 shadow-2xl p-4 text-slate-200 space-y-4">
+    <div className="absolute top-4 right-4 z-40 w-80 max-h-[calc(100vh-88px)] overflow-y-auto rounded-2xl bg-slate-900/95 backdrop-blur-xl border border-slate-700 shadow-2xl p-4 text-slate-200 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
         <div className="flex items-center gap-2">

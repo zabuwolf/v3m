@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
-import { ManageTab, Employee, Team, Candidate, Visitor } from '../../types';
+import { ManageTab, Employee, Team, Candidate, Visitor, SupportTicket } from '../../types';
 import { D } from '../../utils/date';
 import { N } from '../../utils/format';
+import { PayrollPanel } from './PayrollPanel';
+import { OrgChartPanel } from './OrgChartPanel';
+import { MeetingsPanel } from './MeetingsPanel';
 import {
   LayoutDashboard,
   Users,
@@ -12,6 +15,10 @@ import {
   CheckSquare,
   Magnet,
   Coffee,
+  LifeBuoy,
+  Network,
+  Wallet,
+  CalendarDays,
   Settings,
   Plus,
   Search,
@@ -30,12 +37,16 @@ import {
 interface ManageViewProps {
   onSelectEmployee: (empId: string) => void;
   onEditEmployee: (empId?: string | null) => void;
+  tab?: ManageTab;
+  onTabChange?: (tab: ManageTab) => void;
   initialTab?: ManageTab;
 }
 
 export const ManageView: React.FC<ManageViewProps> = ({
   onSelectEmployee,
   onEditEmployee,
+  tab,
+  onTabChange,
   initialTab = 'dashboard',
 }) => {
   const {
@@ -72,6 +83,7 @@ export const ManageView: React.FC<ManageViewProps> = ({
     hireCandidate,
     saveVisitor,
     deleteVisitor,
+    setSupportStatus,
     saveTeam,
     deleteTeam,
     updateZone,
@@ -84,7 +96,12 @@ export const ManageView: React.FC<ManageViewProps> = ({
     addToast,
   } = useStore();
 
-  const [currentTab, setCurrentTab] = useState<ManageTab>(initialTab);
+  const [innerTab, setInnerTab] = useState<ManageTab>(tab ?? initialTab);
+  const currentTab = tab ?? innerTab;
+  const setCurrentTab = (next: ManageTab) => {
+    setInnerTab(next);
+    onTabChange?.(next);
+  };
 
   // Sub-state for attendance date
   const [attDate, setAttDate] = useState<string>(D.today());
@@ -122,19 +139,43 @@ export const ManageView: React.FC<ManageViewProps> = ({
 
   const [visitorModalOpen, setVisitorModalOpen] = useState(false);
   const [editingVisitor, setEditingVisitor] = useState<{ index?: number; visitor: Visitor } | null>(null);
+  const [supportFilter, setSupportFilter] = useState<'open' | 'all' | 'resolved'>('open');
 
-  // Tabs definitions
-  const tabs = [
-    { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard },
-    { id: 'employees', label: 'Nhân sự', icon: Users },
-    { id: 'teams', label: 'Phòng & Tổ', icon: Building },
-    { id: 'attendance', label: 'Chấm công', icon: Clock },
-    { id: 'leaves', label: 'Nghỉ phép', icon: Palmtree },
-    { id: 'tasks', label: 'Công việc', icon: CheckSquare },
-    { id: 'candidates', label: 'Tuyển dụng', icon: Magnet },
-    { id: 'visitors', label: 'Khách mời', icon: Coffee },
-    { id: 'data', label: 'Dữ liệu & Quy tắc', icon: Settings },
-  ] as const;
+  const pendingLeaves = db.leaves.filter(l => l.status === 'pending').length;
+  const openTasks = db.tasks.filter(t => t.status !== 'done').length;
+  const openTickets = (db.supportTickets || []).filter(t => t.status !== 'resolved').length;
+
+  const navGroups: { label: string; items: { id: ManageTab; label: string; icon: React.ComponentType<{ className?: string }>; badge?: number }[] }[] = [
+    {
+      label: 'Điều hành',
+      items: [{ id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard }],
+    },
+    {
+      label: 'Nhân sự',
+      items: [
+        { id: 'employees', label: 'Hồ sơ', icon: Users },
+        { id: 'org', label: 'Sơ đồ', icon: Network },
+        { id: 'payroll', label: 'Phiếu lương', icon: Wallet },
+        { id: 'teams', label: 'Phòng & tổ', icon: Building },
+        { id: 'attendance', label: 'Chấm công', icon: Clock },
+        { id: 'leaves', label: 'Nghỉ phép', icon: Palmtree, badge: pendingLeaves },
+      ],
+    },
+    {
+      label: 'Vận hành',
+      items: [
+        { id: 'meetings', label: 'Lịch họp', icon: CalendarDays },
+        { id: 'tasks', label: 'Công việc', icon: CheckSquare, badge: openTasks },
+        { id: 'candidates', label: 'Tuyển dụng', icon: Magnet },
+        { id: 'visitors', label: 'Khách mời', icon: Coffee },
+        { id: 'support', label: 'Hỗ trợ', icon: LifeBuoy, badge: openTickets },
+      ],
+    },
+    {
+      label: 'Hệ thống',
+      items: [{ id: 'data', label: 'Dữ liệu & quy tắc', icon: Settings }],
+    },
+  ];
 
   // CSV Export
   const handleExportCSV = () => {
@@ -177,41 +218,57 @@ export const ManageView: React.FC<ManageViewProps> = ({
   };
 
   return (
-    <div className="flex h-[calc(100vh-56px)] bg-slate-950 overflow-hidden text-slate-100">
-      {/* Sidebar Tabs */}
-      <aside className="w-56 bg-slate-900/80 border-r border-slate-800 p-3 space-y-1 overflow-y-auto shrink-0 select-none">
-        <div className="text-[11px] font-bold text-slate-400 px-3 py-1.5 uppercase tracking-wider">
-          QUẢN LÝ DOANH NGHIỆP
+    <div className="v3m-workspace flex h-[calc(100vh-56px)] overflow-hidden text-slate-100">
+      <aside className="w-60 bg-[#0b1220]/75 border-r border-white/8 px-3 py-4 space-y-4 overflow-y-auto shrink-0 select-none backdrop-blur-xl">
+        <div className="px-2">
+          <div className="v3m-kicker">Vận hành</div>
+          <div className="text-sm font-semibold text-white mt-1 tracking-tight">Bàn làm việc HR</div>
         </div>
-        {tabs.map(t => {
-          const Icon = t.icon;
-          const isActive = currentTab === t.id;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setCurrentTab(t.id as ManageTab)}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition ${
-                isActive
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              <span>{t.label}</span>
-            </button>
-          );
-        })}
+        {navGroups.map(group => (
+          <div key={group.label} className="space-y-0.5">
+            <div className="px-2.5 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+              {group.label}
+            </div>
+            {group.items.map(t => {
+              const Icon = t.icon;
+              const isActive = currentTab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setCurrentTab(t.id)}
+                  className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition ${
+                    isActive
+                      ? 'bg-white text-slate-950 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-600' : ''}`} />
+                  <span className="flex-1 text-left">{t.label}</span>
+                  {!!t.badge && (
+                    <span
+                      className={`min-w-5 h-5 px-1 rounded-md text-[10px] font-bold flex items-center justify-center ${
+                        isActive ? 'bg-slate-950 text-white' : 'bg-white/8 text-slate-300'
+                      }`}
+                    >
+                      {t.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        ))}
       </aside>
 
-      {/* Main Content Area */}
       <main className="flex-1 p-6 overflow-y-auto">
         {/* Tab 1: Dashboard */}
         {currentTab === 'dashboard' && (
           <div className="max-w-6xl mx-auto space-y-6 animate-fadeIn">
             <div>
-              <h2 className="text-xl font-bold text-white">Tổng quan nhân sự & vận hành</h2>
-              <p className="text-xs text-slate-400">
-                Thống kê số liệu chấm công, xếp hạng tổ chuyên môn và cảnh báo định kỳ
+              <div className="v3m-kicker">Hôm nay</div>
+              <h2 className="text-xl font-semibold text-white mt-1">Tổng quan nhân sự</h2>
+              <p className="text-xs text-slate-400 mt-1">
+                Chấm công, xếp hạng tổ và các việc cần xử lý trong ngày
               </p>
             </div>
 
@@ -224,7 +281,7 @@ export const ManageView: React.FC<ManageViewProps> = ({
               const red = redTeams().length;
 
               return (
-                <div className="grid grid-cols-6 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
                   <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl">
                     <span className="text-[11px] text-slate-400">Tổng nhân sự</span>
                     <b className="text-2xl text-white block mt-0.5">{ov.headcount}</b>
@@ -271,7 +328,7 @@ export const ManageView: React.FC<ManageViewProps> = ({
             })()}
 
             {/* Split row: Ranking & Unchecked */}
-            <div className="grid grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               {/* Ranking Table */}
               <div className="col-span-2 bg-slate-900/90 border border-slate-800 rounded-3xl p-5 space-y-3">
                 <h3 className="text-sm font-bold text-white flex items-center justify-between">
@@ -1247,6 +1304,22 @@ export const ManageView: React.FC<ManageViewProps> = ({
           </div>
         )}
 
+        {currentTab === 'org' && <OrgChartPanel onSelectEmployee={onSelectEmployee} />}
+
+        {currentTab === 'payroll' && <PayrollPanel onSelectEmployee={onSelectEmployee} />}
+
+        {currentTab === 'meetings' && <MeetingsPanel onSelectEmployee={onSelectEmployee} />}
+
+        {currentTab === 'support' && (
+          <SupportDesk
+            tickets={db.supportTickets || []}
+            filter={supportFilter}
+            onFilter={setSupportFilter}
+            empName={id => emp(id)?.name || 'Nhân viên'}
+            onStatus={setSupportStatus}
+          />
+        )}
+
         {/* Tab 9: Data & Rules */}
         {currentTab === 'data' && (
           <div className="max-w-4xl mx-auto space-y-6 animate-fadeIn">
@@ -1941,3 +2014,137 @@ export const ManageView: React.FC<ManageViewProps> = ({
     </div>
   );
 };
+
+const SUPPORT_CAT: Record<SupportTicket['category'], string> = {
+  it: 'IT',
+  hr: 'Nhân sự',
+  admin: 'Hành chính',
+  reception: 'Lễ tân',
+};
+
+const SUPPORT_STATUS: Record<SupportTicket['status'], string> = {
+  pending: 'Chờ xử lý',
+  'in-progress': 'Đang xử lý',
+  resolved: 'Đã xong',
+};
+
+function SupportDesk({
+  tickets,
+  filter,
+  onFilter,
+  empName,
+  onStatus,
+}: {
+  tickets: SupportTicket[];
+  filter: 'open' | 'all' | 'resolved';
+  onFilter: (f: 'open' | 'all' | 'resolved') => void;
+  empName: (id: string) => string;
+  onStatus: (id: string, status: SupportTicket['status']) => void;
+}) {
+  const shown = tickets.filter(t => {
+    if (filter === 'open') return t.status !== 'resolved';
+    if (filter === 'resolved') return t.status === 'resolved';
+    return true;
+  });
+
+  return (
+    <div className="max-w-6xl mx-auto space-y-4 animate-fadeIn">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <div className="v3m-kicker">Service desk</div>
+          <h2 className="text-xl font-semibold text-white mt-1">Yêu cầu hỗ trợ nội bộ</h2>
+          <p className="text-xs text-slate-400 mt-1">
+            Tiếp nhận từ thao tác nhanh trên văn phòng 3D. Nhận xử lý hoặc đóng khi đã xong.
+          </p>
+        </div>
+        <div className="flex bg-black/30 border border-white/10 p-1 rounded-xl">
+          {(
+            [
+              ['open', 'Đang mở'],
+              ['all', 'Tất cả'],
+              ['resolved', 'Đã xong'],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => onFilter(id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                filter === id ? 'bg-white text-slate-950' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {shown.map(t => (
+          <article
+            key={t.id}
+            className="bg-slate-900/90 border border-slate-800 rounded-2xl px-4 py-3.5 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4"
+          >
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm font-semibold text-white">{t.title}</h3>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-white/5 border border-white/10 text-slate-300">
+                  {SUPPORT_CAT[t.category]}
+                </span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold ${
+                    t.priority === 'high'
+                      ? 'bg-rose-500/15 text-rose-300'
+                      : t.priority === 'low'
+                      ? 'bg-slate-700/60 text-slate-300'
+                      : 'bg-amber-500/15 text-amber-200'
+                  }`}
+                >
+                  {t.priority === 'high' ? 'Gấp' : t.priority === 'low' ? 'Thấp' : 'Thường'}
+                </span>
+                <span className="text-[10px] text-slate-500">{SUPPORT_STATUS[t.status]}</span>
+              </div>
+              <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">{t.details}</p>
+              <div className="text-[11px] text-slate-500 mt-2">
+                {empName(t.empId)}
+                {t.assignee ? ` · ${t.assignee}` : ''}
+                {t.deskCoord ? ` · ${t.deskCoord}` : ''}
+                {t.createdAt ? ` · ${t.createdAt}` : ''}
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {t.status === 'pending' && (
+                <button
+                  onClick={() => onStatus(t.id, 'in-progress')}
+                  className="px-2.5 py-1.5 rounded-lg bg-white text-slate-950 text-[11px] font-semibold"
+                >
+                  Nhận xử lý
+                </button>
+              )}
+              {t.status !== 'resolved' && (
+                <button
+                  onClick={() => onStatus(t.id, 'resolved')}
+                  className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold"
+                >
+                  Đóng
+                </button>
+              )}
+              {t.status === 'resolved' && (
+                <button
+                  onClick={() => onStatus(t.id, 'pending')}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-200 text-[11px] font-semibold border border-slate-700"
+                >
+                  Mở lại
+                </button>
+              )}
+            </div>
+          </article>
+        ))}
+        {shown.length === 0 && (
+          <div className="py-16 text-center text-sm text-slate-500 border border-dashed border-white/10 rounded-2xl">
+            Không có yêu cầu trong bộ lọc này.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore, StoreProvider } from './context/StoreContext';
-import { ViewTab } from './types';
+import { ManageTab, ViewTab } from './types';
+import { CommandPalette } from './components/search/CommandPalette';
 import { Topbar } from './components/layout/Topbar';
 import { OfficeCanvas } from './components/office/OfficeCanvas';
 import { OfficeSettings } from './components/office/OfficeSettings';
@@ -13,12 +14,15 @@ import { ZoneModal } from './components/modals/ZoneModal';
 import { AgentModal } from './components/modals/AgentModal';
 import { AlertsModal } from './components/modals/AlertsModal';
 import { ReceptionChatModal } from './components/modals/ReceptionChatModal';
+import { FirstLogin } from './components/auth/FirstLogin';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const { toasts, removeToast } = useStore();
 
   const [currentView, setCurrentView] = useState<ViewTab>('office');
+  const [manageTab, setManageTab] = useState<ManageTab>('dashboard');
+  const [searchOpen, setSearchOpen] = useState(false);
 
   // Modals & Drawers state
   const [selectedEmpId, setSelectedEmpId] = useState<string | null>(null);
@@ -46,8 +50,19 @@ const AppContent: React.FC = () => {
     }
   }, []);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
-    <div className="flex flex-col w-screen h-screen overflow-hidden bg-slate-950 font-sans select-none">
+    <div className="v3m-app flex flex-col w-screen h-screen overflow-hidden bg-transparent font-sans select-none">
       {/* Top Navigation Bar */}
       <Topbar
         currentView={currentView}
@@ -57,6 +72,7 @@ const AppContent: React.FC = () => {
         }}
         onOpenReceptionChat={() => setReceptionChatOpen(true)}
         onOpenAlerts={() => setAlertsModalOpen(true)}
+        onOpenSearch={() => setSearchOpen(true)}
       />
 
       {/* Main View Area */}
@@ -81,6 +97,8 @@ const AppContent: React.FC = () => {
         {currentView === 'manage' && (
           <div className="w-full h-full">
             <ManageView
+              tab={manageTab}
+              onTabChange={setManageTab}
               onSelectEmployee={id => setSelectedEmpId(id)}
               onEditEmployee={id => setEditEmpId({ id })}
             />
@@ -197,17 +215,30 @@ const AppContent: React.FC = () => {
         />
       )}
 
+      <FirstLogin />
+
+      <CommandPalette
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        onOpenEmployee={id => setSelectedEmpId(id)}
+        onNavigate={(view, tab) => {
+          if (tab) setManageTab(tab);
+          setCurrentView(view);
+          setIsTouring(false);
+        }}
+      />
+
       {/* Toast Notifications */}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+      <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none">
         {toasts.map(t => (
           <div
             key={t.id}
-            className={`pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-2xl border text-xs font-semibold backdrop-blur-xl animate-fadeIn ${
+            className={`pointer-events-auto flex items-center gap-2.5 min-w-56 px-3.5 py-2.5 rounded-xl shadow-2xl border text-[13px] font-medium backdrop-blur-xl animate-fadeIn ${
               t.type === 'success'
-                ? 'bg-emerald-950/90 border-emerald-800 text-emerald-200'
+                ? 'bg-emerald-950/90 border-emerald-700/70 text-emerald-100'
                 : t.type === 'warn'
-                ? 'bg-amber-950/90 border-amber-800 text-amber-200'
-                : 'bg-slate-900/90 border-slate-700 text-slate-100'
+                ? 'bg-amber-950/90 border-amber-700/70 text-amber-100'
+                : 'bg-slate-900/95 border-slate-600/70 text-slate-100'
             }`}
           >
             {t.type === 'success' ? (

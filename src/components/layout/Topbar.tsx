@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { ViewTab } from '../../types';
-import { Building2, Users, BarChart3, MessageSquare, Bell, Check, Wifi } from 'lucide-react';
+import { Building2, Users, BarChart3, MessageSquare, Bell, Check, Search } from 'lucide-react';
 
 interface TopbarProps {
   currentView: ViewTab;
   onSelectView: (view: ViewTab) => void;
   onOpenReceptionChat: () => void;
   onOpenAlerts: () => void;
+  onOpenSearch: () => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({
@@ -15,108 +16,130 @@ export const Topbar: React.FC<TopbarProps> = ({
   onSelectView,
   onOpenReceptionChat,
   onOpenAlerts,
+  onOpenSearch,
 }) => {
-  const { db, savedFlash, redTeams, reminderTeams } = useStore();
+  const { db, savedFlash, redTeams, reminderTeams, sessionEmpId, emp, shortName, logout } = useStore();
+  const me = sessionEmpId ? emp(sessionEmpId) : undefined;
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const pendingLeaves = db.leaves.filter(l => l.status === 'pending').length;
-  const alertCount = redTeams().length + reminderTeams().length + pendingLeaves;
+  const openTickets = (db.supportTickets || []).filter(t => t.status !== 'resolved').length;
+  const alertCount = redTeams().length + reminderTeams().length + pendingLeaves + openTickets;
+
+  const clock = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  const dateLabel = now.toLocaleDateString('vi-VN', {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+  });
+
+  const tabs: { id: ViewTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+    { id: 'office', label: 'Văn phòng', icon: Building2 },
+    { id: 'manage', label: 'Nhân sự', icon: Users },
+    { id: 'reports', label: 'Báo cáo', icon: BarChart3 },
+  ];
 
   return (
-    <header className="h-14 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-4 z-40 select-none">
-      {/* Brand logo */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-500 flex items-center justify-center font-extrabold text-white text-sm shadow-md shadow-indigo-500/20">
-            {db.company.short.slice(0, 3)}
+    <header className="h-14 shrink-0 relative z-40 flex items-center justify-between px-4 border-b border-white/8 bg-[#0b1220]/80 backdrop-blur-xl select-none">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center font-bold text-white text-[11px] tracking-tight shadow-[0_8px_20px_-8px_rgba(99,102,241,0.9)] ring-1 ring-white/20">
+          {db.company.short.slice(0, 3)}
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-[13px] tracking-tight text-white truncate">
+              {db.company.name}
+            </span>
+            <span className="hidden sm:inline text-[10px] px-1.5 py-px rounded-md bg-white/5 text-slate-300 font-medium border border-white/10">
+              Office
+            </span>
           </div>
-          <div>
-            <div className="font-extrabold text-sm tracking-tight text-white flex items-center gap-1.5">
-              <span>{db.company.name}</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-400 font-mono font-semibold border border-indigo-500/30">
-                PRO 3D
-              </span>
-            </div>
-            <div className="text-[10px] text-slate-400 font-medium">
-              {db.company.slogan}
-            </div>
-          </div>
+          <div className="text-[10px] text-slate-500 truncate">{db.company.slogan}</div>
         </div>
       </div>
 
-      {/* Center Navigation Tabs */}
-      <nav className="flex items-center gap-1 bg-slate-950/60 p-1 rounded-xl border border-slate-800">
-        <button
-          onClick={() => onSelectView('office')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-            currentView === 'office'
-              ? 'bg-indigo-600 text-white shadow'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-          }`}
-        >
-          <Building2 className="w-3.5 h-3.5" />
-          <span>Văn phòng 3D</span>
-        </button>
-
-        <button
-          onClick={() => onSelectView('manage')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-            currentView === 'manage'
-              ? 'bg-indigo-600 text-white shadow'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-          }`}
-        >
-          <Users className="w-3.5 h-3.5" />
-          <span>Quản lý nhân sự</span>
-        </button>
-
-        <button
-          onClick={() => onSelectView('reports')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-            currentView === 'reports'
-              ? 'bg-indigo-600 text-white shadow'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-          }`}
-        >
-          <BarChart3 className="w-3.5 h-3.5" />
-          <span>Báo cáo</span>
-        </button>
+      <nav className="flex items-center gap-0.5 p-1 rounded-xl bg-black/25 border border-white/8">
+        {tabs.map(tab => {
+          const Icon = tab.icon;
+          const active = currentView === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => onSelectView(tab.id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium transition ${
+                active
+                  ? 'bg-white text-slate-950 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
       </nav>
 
-      {/* Right controls */}
-      <div className="flex items-center gap-2">
-        {/* Save indicator */}
+      <div className="flex items-center gap-1.5">
+        <div className="hidden md:flex flex-col items-end mr-2 leading-none">
+          <span className="text-[13px] font-semibold text-white tabular-nums">{clock}</span>
+          <span className="text-[10px] text-slate-500 capitalize mt-0.5">{dateLabel}</span>
+        </div>
+
         <div
-          className={`flex items-center gap-1 text-[11px] font-medium transition-opacity duration-300 ${
-            savedFlash ? 'opacity-100 text-emerald-400' : 'opacity-40 text-slate-400'
+          className={`hidden lg:flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-lg border transition-opacity ${
+            savedFlash
+              ? 'opacity-100 text-emerald-300 border-emerald-500/30 bg-emerald-500/10'
+              : 'opacity-70 text-slate-500 border-transparent'
           }`}
         >
           <Check className="w-3.5 h-3.5" />
           <span>{savedFlash ? 'Đã lưu' : 'Tự lưu'}</span>
         </div>
 
-        {/* Online dot */}
-        <div title="Máy chủ trực tuyến" className="flex items-center gap-1 text-[11px] text-slate-400 px-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-        </div>
+        {me?.avatar?.chosen && (
+          <button
+            onClick={logout}
+            title="Đăng xuất"
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-slate-200 bg-white/5 border border-white/10 text-[11px] max-w-[140px]"
+          >
+            <span className="truncate">{shortName(me)}</span>
+            <span className="text-slate-500">Thoát</span>
+          </button>
+        )}
 
-        {/* Receptionist chat button */}
         <button
-          onClick={onOpenReceptionChat}
-          title="Lễ tân & Sảnh Café"
-          className="relative p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 transition shadow-sm"
+          onClick={onOpenSearch}
+          title="Tìm nhanh"
+          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-slate-400 hover:text-white bg-white/5 border border-white/10 text-[11px]"
         >
-          <MessageSquare className="w-4 h-4 text-amber-400" />
+          <Search className="w-3.5 h-3.5" />
+          <span>Tìm</span>
+          <span className="text-[10px] text-slate-500">Ctrl K</span>
         </button>
 
-        {/* Alert Bell */}
+        <span title="Dữ liệu cục bộ đang hoạt động" className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+
+        <button
+          onClick={onOpenReceptionChat}
+          title="Lễ tân"
+          className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/8 border border-transparent hover:border-white/10 transition"
+        >
+          <MessageSquare className="w-4 h-4" />
+        </button>
+
         <button
           onClick={onOpenAlerts}
-          title="Cần xử lý & Đơn nghỉ chờ duyệt"
-          className="relative p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 transition shadow-sm"
+          title="Cần xử lý"
+          className="relative p-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/8 border border-transparent hover:border-white/10 transition"
         >
-          <Bell className="w-4 h-4 text-slate-300" />
+          <Bell className="w-4 h-4" />
           {alertCount > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-extrabold flex items-center justify-center animate-bounce">
+            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center ring-2 ring-[#0b1220]">
               {alertCount}
             </span>
           )}

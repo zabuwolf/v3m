@@ -21,6 +21,7 @@ import {
   Video,
   Sparkles,
 } from 'lucide-react';
+import { drawPerson } from './drawPerson';
 import { MeetingSchedulerDrawer } from './MeetingSchedulerDrawer';
 import { VirtualMeetingModal } from '../modals/VirtualMeetingModal';
 
@@ -36,6 +37,8 @@ interface HitTarget {
   y: number;
   w: number;
   h: number;
+  /** world = floor grid, label = etched name, iso = sprite box in iso pixels */
+  space?: 'world' | 'label' | 'iso';
 }
 
 interface Camera {
@@ -76,6 +79,57 @@ interface OfficeCanvasProps {
   focusedEmpId?: string | null;
   focusedZoneId?: string | null;
   isTouring?: boolean;
+}
+
+function drawTeamSections(
+  ctx: CanvasRenderingContext2D,
+  iso: (x: number, y: number) => { x: number; y: number },
+  z: Zone,
+  db: { employees: Employee[]; teams: { id: string; name: string; color: string }[] },
+) {
+  const people = db.employees.filter(e => e.dept === z.id && e.status !== 'resigned' && e.desk);
+  const groups = new Map<string, Employee[]>();
+  for (const e of people) {
+    const list = groups.get(e.team) || [];
+    list.push(e);
+    groups.set(e.team, list);
+  }
+  if (groups.size < 2) return;
+
+  for (const [teamId, members] of groups) {
+    const team = db.teams.find(t => t.id === teamId);
+    if (!team || members.length === 0) continue;
+    const xs = members.map(m => m.desk!.x);
+    const ys = members.map(m => m.desk!.y);
+    const x0 = Math.max(z.x + 0.15, Math.min(...xs) - 0.45);
+    const y0 = Math.max(z.y + 0.15, Math.min(...ys) - 0.3);
+    const x1 = Math.min(z.x + z.w - 0.15, Math.max(...xs) + 1.2);
+    const y1 = Math.min(z.y + z.h - 0.15, Math.max(...ys) + 1.05);
+    const corners = [iso(x0, y0), iso(x1, y0), iso(x1, y1), iso(x0, y1)];
+
+    ctx.save();
+    ctx.beginPath();
+    corners.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    ctx.closePath();
+    ctx.fillStyle = team.color;
+    ctx.globalAlpha = 0.18;
+    ctx.fill();
+    ctx.globalAlpha = 0.8;
+    ctx.setLineDash([4, 3]);
+    ctx.lineWidth = 1.15;
+    ctx.strokeStyle = team.color;
+    ctx.stroke();
+    ctx.restore();
+
+    const ep = iso(x0 + 0.2, Math.min(y1 - 0.15, y0 + 0.85));
+    ctx.save();
+    ctx.transform(1, 0.5, -1, 0.5, ep.x, ep.y);
+    ctx.font = '700 8px "Plus Jakarta Sans", sans-serif';
+    ctx.fillStyle = team.color;
+    ctx.globalAlpha = 0.95;
+    ctx.fillText(team.name.toUpperCase(), 0, 0);
+    ctx.restore();
+  }
 }
 
 export const OfficeCanvas: React.FC<OfficeCanvasProps> = ({
@@ -474,527 +528,6 @@ export const OfficeCanvas: React.FC<OfficeCanvasProps> = ({
     return { t00, t10, t11, t01 };
   }, [iso]);
 
-  // Color brightness/tint adjuster for low-poly planar lighting
-  const adjHex = useCallback((hex: string, amt: number): string => {
-    let c = hex.replace('#', '');
-    if (c.length === 3) c = c.split('').map(x => x + x).join('');
-    const num = parseInt(c, 16);
-    if (isNaN(num)) return hex;
-    const r = Math.min(255, Math.max(0, (num >> 16) + amt));
-    const g = Math.min(255, Math.max(0, ((num >> 8) & 0x00ff) + amt));
-    const b = Math.min(255, Math.max(0, (num & 0x0000ff) + amt));
-    return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
-  }, []);
-
-  // Higher-Quality Low-Poly 3D Character Renderer with Professional Animations
-  const drawPerson = useCallback((
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    av: Employee['avatar'] = {},
-    shirt: string,
-    gender: 'M' | 'F',
-    phase: number,
-    isLead: boolean,
-    deptId: string = 'nhan-su',
-    role: string = '',
-    status: string = 'present',
-    isSeated: boolean = true
-  ) => {
-    const isAway = status === 'absent' || status === 'leave' || status === 'off';
-    const isRemote = status === 'remote';
-    const isLate = status === 'late';
-
-    ctx.save();
-    // "ai off thì xám cả người cả bảng tên": Full monochrome grayscale when off/absent
-    if (isAway) {
-      ctx.filter = 'grayscale(100%) opacity(55%)';
-    }
-
-    // Helper: Draw planar faceted polygon with optional edge bevel
-    const poly = (pts: [number, number][], fill: string, stroke?: string, sw = 0.5) => {
-      ctx.beginPath();
-      ctx.moveTo(pts[0][0], pts[0][1]);
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
-      ctx.closePath();
-      ctx.fillStyle = fill;
-      ctx.fill();
-      if (stroke) {
-        ctx.strokeStyle = stroke;
-        ctx.lineWidth = sw;
-        ctx.stroke();
-      }
-    };
-
-    // State-Aware Professional Animations:
-    // Active: Natural chest respiration, screen micro-gaze, alternating finger typing & periodic mouse reach
-    // Offline: Static resting posture, zero typing, slightly lowered relaxed head angle
-    let bob = 0;
-    let headNod = 0;
-    let lTap = 0;
-    let rTap = 0;
-    let mouseReach = 0;
-
-    if (isAway) {
-      // Offline / Away: Quiet rest pose
-      bob = 0;
-      headNod = 1.2; // Head slightly rested down
-      lTap = 0;
-      rTap = 0;
-      mouseReach = 0;
-    } else {
-      // Active / Present / Remote: Dynamic professional animation
-      bob = Math.sin(phase * 2.3) * 0.45; // Respiration
-      headNod = Math.sin(phase * 1.6) * 0.25; // Subtle focus nod
-      // Fast articulate typing cadence on workstation
-      const typingSpeed = isLate ? 10.5 : 8.2;
-      lTap = Math.sin(phase * typingSpeed) * 0.85;
-      rTap = Math.cos(phase * typingSpeed + 0.35) * 0.85;
-
-      // Periodic mouse interaction on desk
-      if (Math.sin(phase * 0.75) > 0.45) {
-        mouseReach = 2.4;
-        rTap = 0.15;
-      }
-    }
-
-    const skin = av.skin || (gender === 'F' ? '#fde2cc' : '#f8d5b8');
-    const hair = av.hairColor || '#23160e';
-
-    // 1. Faceted Ground Contact Shadow
-    poly(
-      [
-        [px - 11, py + 1],
-        [px - 6, py - 3],
-        [px + 6, py - 3],
-        [px + 11, py + 1],
-        [px + 6, py + 5],
-        [px - 6, py + 5],
-      ],
-      'rgba(15, 23, 42, 0.16)'
-    );
-
-    // 2. High-Quality Low-Poly Ergonomic Office Chair (Aeron 3D Model)
-    if (isSeated) {
-      // Low-poly 5-star starbase spokes & casters
-      const starBase = [
-        [px - 8.5, py + 1.5],
-        [px + 8.5, py + 1.5],
-        [px - 6, py - 3.5],
-        [px + 6, py - 3.5],
-        [px, py + 4],
-      ];
-      ctx.strokeStyle = '#475569';
-      ctx.lineWidth = 1.3;
-      ctx.beginPath();
-      starBase.forEach(([sx, sy]) => {
-        ctx.moveTo(px, py - 1);
-        ctx.lineTo(sx, sy);
-      });
-      ctx.stroke();
-
-      // Low-poly caster blocks
-      ctx.fillStyle = '#0f172a';
-      starBase.forEach(([sx, sy]) => {
-        poly([[sx - 1.2, sy - 1], [sx + 1.2, sy - 1], [sx + 1.2, sy + 1.2], [sx - 1.2, sy + 1.2]], '#0f172a');
-      });
-
-      // Faceted Pneumatic Gas-Lift Column
-      poly([[px - 1.8, py - 9], [px, py - 9.5], [px, py - 1], [px - 1.8, py - 1]], '#94a3b8');
-      poly([[px, py - 9.5], [px + 1.8, py - 9], [px + 1.8, py - 1], [px, py - 1]], '#475569');
-
-      // Low-Poly Ergonomic Mesh Backrest (Positioned behind torso)
-      // Left wing facet (lit)
-      poly(
-        [
-          [px - 11, py - 36],
-          [px - 4, py - 38],
-          [px - 3, py - 16],
-          [px - 9, py - 15],
-        ],
-        '#334155'
-      );
-      // Center mesh panel (dark breathable mesh)
-      poly(
-        [
-          [px - 4, py - 38],
-          [px + 4, py - 38],
-          [px + 3, py - 16],
-          [px - 3, py - 16],
-        ],
-        '#1e293b'
-      );
-      // Right wing facet (shadow)
-      poly(
-        [
-          [px + 4, py - 38],
-          [px + 11, py - 36],
-          [px + 9, py - 15],
-          [px + 3, py - 16],
-        ],
-        '#0f172a'
-      );
-
-      // Low-Poly Lumbar Support Spine Bar
-      poly(
-        [
-          [px - 6.5, py - 23],
-          [px + 6.5, py - 23],
-          [px + 5.5, py - 21],
-          [px - 5.5, py - 21],
-        ],
-        '#64748b'
-      );
-
-      // Low-Poly Executive Headrest
-      poly(
-        [
-          [px - 6.5, py - 43],
-          [px + 6.5, py - 43],
-          [px + 5.5, py - 39],
-          [px - 5.5, py - 39],
-        ],
-        '#0f172a'
-      );
-      poly(
-        [
-          [px - 6.5, py - 43],
-          [px, py - 44],
-          [px + 6.5, py - 43],
-          [px, py - 42.5],
-        ],
-        '#334155'
-      );
-
-      // Low-Poly 3D Armrest Blocks
-      // Left armrest
-      poly([[px - 13.5, py - 23], [px - 9, py - 23], [px - 9, py - 20.5], [px - 13.5, py - 20.5]], '#334155');
-      poly([[px - 13.5, py - 20.5], [px - 9, py - 20.5], [px - 10, py - 13], [px - 12.5, py - 13]], '#1e293b');
-      // Right armrest
-      poly([[px + 9, py - 23], [px + 13.5, py - 23], [px + 13.5, py - 20.5], [px + 9, py - 20.5]], '#1e293b');
-      poly([[px + 9, py - 20.5], [px + 13.5, py - 20.5], [px + 12.5, py - 13], [px + 10, py - 13]], '#0f172a');
-
-      // Low-Poly Hexagonal Seat Cushion
-      poly(
-        [
-          [px - 10, py - 14],
-          [px, py - 15.5],
-          [px + 10, py - 14],
-          [px + 8.5, py - 8.5],
-          [px - 8.5, py - 8.5],
-        ],
-        '#1e293b'
-      );
-      poly([[px - 8.5, py - 8.5], [px + 8.5, py - 8.5], [px + 7.5, py - 7], [px - 7.5, py - 7]], '#0f172a');
-    }
-
-    // 3. Low-Poly Lower Body (Tailored Slacks & Shoes)
-    if (isSeated) {
-      // Left thigh facet
-      poly([[px - 6.5, py - 12], [px - 1.2, py - 12], [px - 1.5, py - 2.5], [px - 6.8, py - 2.5]], '#263449');
-      // Right thigh facet (shadowed)
-      poly([[px + 1.2, py - 12], [px + 6.5, py - 12], [px + 6.8, py - 2.5], [px + 1.5, py - 2.5]], '#162130');
-
-      // Low-poly dress shoes
-      // Left shoe
-      poly([[px - 7.5, py - 2.5], [px - 2, py - 2.5], [px - 2.5, py + 0.8], [px - 7.8, py + 0.8]], '#0f172a');
-      poly([[px - 7.8, py + 0.8], [px - 2.5, py + 0.8], [px - 2.8, py + 1.5], [px - 7.5, py + 1.5]], '#475569');
-      // Right shoe
-      poly([[px + 2, py - 2.5], [px + 7.5, py - 2.5], [px + 7.8, py + 0.8], [px + 2.5, py + 0.8]], '#090d16');
-      poly([[px + 2.5, py + 0.8], [px + 7.8, py + 0.8], [px + 7.5, py + 1.5], [px + 2.8, py + 1.5]], '#334155');
-    } else {
-      // Standing legs (e.g. Lounge Visitors)
-      poly([[px - 5.5, py - 13], [px - 0.8, py - 13], [px - 1.2, py], [px - 5.8, py]], '#263449');
-      poly([[px + 0.8, py - 13], [px + 5.5, py - 13], [px + 5.8, py], [px + 1.2, py]], '#162130');
-      poly([[px - 6.5, py], [px - 1, py], [px - 1.5, py + 2.5], [px - 7, py + 2.5]], '#0f172a');
-      poly([[px + 1, py], [px + 6.5, py], [px + 7, py + 2.5], [px + 1.5, py + 2.5]], '#090d16');
-    }
-
-    // 4. Low-Poly Torso & Tailored Business Attire
-    const torsoY = py - 27 + bob;
-
-    // Planar Low-Poly Chest Facets
-    // Top shoulder plane (sunlit facet)
-    poly(
-      [
-        [px - 8.5, torsoY + 2],
-        [px, torsoY],
-        [px + 8.5, torsoY + 2],
-        [px, torsoY + 4],
-      ],
-      adjHex(shirt, 32)
-    );
-    // Left chest plane (key lit facet)
-    poly(
-      [
-        [px - 8.5, torsoY + 2],
-        [px, torsoY + 4],
-        [px, torsoY + 16],
-        [px - 8.5, torsoY + 15],
-      ],
-      adjHex(shirt, 12)
-    );
-    // Right chest plane (shadow facet)
-    poly(
-      [
-        [px, torsoY + 4],
-        [px + 8.5, torsoY + 2],
-        [px + 8.5, torsoY + 15],
-        [px, torsoY + 16],
-      ],
-      adjHex(shirt, -24)
-    );
-
-    // Department-Specific Low-Poly Tailoring:
-    if (isLead || deptId === 'dieu-hanh' || deptId === 'leader-hub') {
-      // Executive Blazer: Dark faceted lapels
-      poly(
-        [
-          [px - 8.5, torsoY + 2],
-          [px - 4, torsoY + 4],
-          [px - 1.5, torsoY + 15],
-          [px - 8.5, torsoY + 15],
-        ],
-        '#0f172a'
-      );
-      poly(
-        [
-          [px + 8.5, torsoY + 2],
-          [px + 4, torsoY + 4],
-          [px + 1.5, torsoY + 15],
-          [px + 8.5, torsoY + 15],
-        ],
-        '#090d16'
-      );
-      // Crisp white inner shirt triangular facet
-      poly(
-        [
-          [px - 3.8, torsoY + 3],
-          [px + 3.8, torsoY + 3],
-          [px, torsoY + 11],
-        ],
-        '#ffffff'
-      );
-      // Silk tie or gold pendant
-      if (gender === 'M') {
-        poly([[px - 1.2, torsoY + 3], [px + 1.2, torsoY + 3], [px + 0.8, torsoY + 10], [px, torsoY + 12], [px - 0.8, torsoY + 10]], '#dc2626');
-      } else {
-        poly([[px - 2.5, torsoY + 4], [px + 2.5, torsoY + 4], [px, torsoY + 7.5]], '#f59e0b');
-      }
-      // Faceted Golden Leader Star Lapel Pin
-      poly([[px - 5.5, torsoY + 4], [px - 4.2, torsoY + 5.2], [px - 5.5, torsoY + 6.4], [px - 6.8, torsoY + 5.2]], '#f59e0b');
-    } else if (deptId === 'ky-thuat') {
-      // Tech Apparel: Low-Poly collar placket
-      poly([[px - 1.2, torsoY + 3], [px + 1.2, torsoY + 3], [px + 1.2, torsoY + 10], [px - 1.2, torsoY + 10]], 'rgba(255, 255, 255, 0.28)');
-      // Low-poly studio headphones resting around neck
-      poly([[px - 8, torsoY + 1], [px, torsoY + 3.5], [px + 8, torsoY + 1], [px, torsoY + 5]], '#38bdf8');
-      poly([[px - 10.5, torsoY], [px - 7.5, torsoY], [px - 7.5, torsoY + 5], [px - 10.5, torsoY + 5]], '#0f172a');
-      poly([[px + 7.5, torsoY], [px + 10.5, torsoY], [px + 10.5, torsoY + 5], [px + 7.5, torsoY + 5]], '#090d16');
-    } else if (deptId === 'marketing') {
-      // Marketing Creative: Layered knit collar & pastel studio lanyard
-      poly([[px - 4, torsoY + 2.5], [px + 4, torsoY + 2.5], [px, torsoY + 7]], 'rgba(255, 255, 255, 0.42)');
-      poly([[px - 3.5, torsoY + 4], [px + 3.5, torsoY + 4], [px, torsoY + 8]], '#ec4899');
-    } else {
-      // Business Casual Oxford with Low-Poly ID Badge
-      poly([[px - 1.2, torsoY + 2], [px + 1.2, torsoY + 2], [px + 1.2, torsoY + 11], [px - 1.2, torsoY + 11]], 'rgba(255, 255, 255, 0.35)');
-      // Low-poly ID card badge
-      poly([[px - 2.5, torsoY + 8], [px + 2.5, torsoY + 8], [px + 2.5, torsoY + 14], [px - 2.5, torsoY + 14]], '#f8fafc');
-      poly([[px - 2, torsoY + 8.5], [px + 2, torsoY + 8.5], [px + 2, torsoY + 10], [px - 2, torsoY + 10]], shirt);
-    }
-
-    // 5. Low-Poly Articulated Arms & Hands (Interactive Animations)
-    // Left sleeve & forearm
-    poly(
-      [
-        [px - 8.5, torsoY + 2],
-        [px - 11.5, torsoY + 4],
-        [px - 11, torsoY + 11],
-        [px - 8, torsoY + 9],
-      ],
-      adjHex(shirt, 8)
-    );
-    // Right sleeve & forearm
-    poly(
-      [
-        [px + 8.5, torsoY + 2],
-        [px + 11.5, torsoY + 4],
-        [px + 11, torsoY + 11],
-        [px + 8, torsoY + 9],
-      ],
-      adjHex(shirt, -20)
-    );
-
-    // Smartwatch on left wrist
-    poly([[px - 11.5, torsoY + 10], [px - 7.5, torsoY + 10], [px - 7.5, torsoY + 12], [px - 11.5, torsoY + 12]], '#0f172a');
-    if (!isAway) {
-      poly([[px - 10.5, torsoY + 10.4], [px - 8.5, torsoY + 10.4], [px - 8.5, torsoY + 11.6], [px - 10.5, torsoY + 11.6]], '#38bdf8');
-    }
-
-    // Low-Poly Faceted Hands
-    // Left hand (animating with lTap typing)
-    const lhY = torsoY + 11 + lTap;
-    poly(
-      [
-        [px - 11, lhY],
-        [px - 7.5, lhY - 0.5],
-        [px - 7, lhY + 3.8],
-        [px - 10.5, lhY + 3.8],
-      ],
-      adjHex(skin, 10)
-    );
-    // Right hand (animating with rTap or reaching to mouse)
-    const rhX = px + 7.5 + mouseReach;
-    const rhY = torsoY + 11 + rTap;
-    poly(
-      [
-        [rhX, rhY - 0.5],
-        [rhX + 3.5, rhY],
-        [rhX + 3, rhY + 3.8],
-        [rhX - 0.5, rhY + 3.8],
-      ],
-      adjHex(skin, -16)
-    );
-
-    // 6. Low-Poly 3D Geometric Head
-    const hy = py - 35.5 + bob + headNod;
-
-    // Neck facet
-    poly([[px - 2, hy + 6.5], [px + 2, hy + 6.5], [px + 2, hy + 10], [px - 2, hy + 10]], adjHex(skin, -24));
-
-    // 6-Facet Low-Poly Head Geometry:
-    // Facet 1: Top forehead plane (keylit)
-    poly([[px - 7.5, hy - 4], [px, hy - 7.5], [px + 7.5, hy - 4], [px, hy - 2]], adjHex(skin, 24));
-    // Facet 2: Left front cheek (direct light)
-    poly([[px - 7.5, hy - 4], [px, hy - 2], [px, hy + 5.5], [px - 6.5, hy + 4]], adjHex(skin, 10));
-    // Facet 3: Right front cheek (mid-tone shadow)
-    poly([[px, hy - 2], [px + 7.5, hy - 4], [px + 6.5, hy + 4], [px, hy + 5.5]], adjHex(skin, -14));
-    // Facet 4: Left jaw & chin
-    poly([[px - 6.5, hy + 4], [px, hy + 5.5], [px, hy + 8.5], [px - 4, hy + 7.8]], adjHex(skin, -8));
-    // Facet 5: Right jaw & chin
-    poly([[px, hy + 5.5], [px + 6.5, hy + 4], [px + 4, hy + 7.8], [px, hy + 8.5]], adjHex(skin, -26));
-
-    // Minimalist Low-Poly Eyes & Eyebrows
-    const eyeY = hy + 1.2;
-    if (isAway) {
-      // Offline / Away: Quiet closed resting eyelids
-      poly([[px - 4.5, eyeY + 0.6], [px - 2.2, eyeY + 0.8], [px - 2.4, eyeY + 1.6], [px - 4.3, eyeY + 1.4]], '#64748b');
-      poly([[px + 2.2, eyeY + 0.8], [px + 4.5, eyeY + 0.6], [px + 4.3, eyeY + 1.4], [px + 2.4, eyeY + 1.6]], '#64748b');
-    } else {
-      // Left eye (faceted angular polygon)
-      poly([[px - 4.5, eyeY - 0.8], [px - 2.2, eyeY - 1], [px - 2.4, eyeY + 1.2], [px - 4.3, eyeY + 1]], '#1e293b');
-      // Right eye (faceted angular polygon)
-      poly([[px + 2.2, eyeY - 1], [px + 4.5, eyeY - 0.8], [px + 4.3, eyeY + 1], [px + 2.4, eyeY + 1.2]], '#1e293b');
-
-      // Specular catchlights (active alert glint)
-      poly([[px - 4.2, eyeY - 0.6], [px - 3.2, eyeY - 0.6], [px - 3.2, eyeY + 0.2], [px - 4.2, eyeY + 0.2]], '#ffffff');
-      poly([[px + 2.6, eyeY - 0.6], [px + 3.6, eyeY - 0.6], [px + 3.6, eyeY + 0.2], [px + 2.6, eyeY + 0.2]], '#ffffff');
-    }
-
-    // Low-poly natural eyebrows
-    ctx.strokeStyle = hair;
-    ctx.lineWidth = 1.1;
-    ctx.beginPath();
-    ctx.moveTo(px - 4.8, eyeY - 3.2);
-    ctx.lineTo(px - 1.8, eyeY - 3.6);
-    ctx.moveTo(px + 1.8, eyeY - 3.6);
-    ctx.lineTo(px + 4.8, eyeY - 3.2);
-    ctx.stroke();
-
-    // Subtle low-poly micro-smile
-    ctx.strokeStyle = '#9f1239';
-    ctx.lineWidth = 0.9;
-    ctx.beginPath();
-    ctx.moveTo(px - 1.8, hy + 5.4);
-    ctx.lineTo(px, hy + 6.1);
-    ctx.lineTo(px + 1.8, hy + 5.4);
-    ctx.stroke();
-
-    // Low-Poly Designer Eyeglasses (when av.glasses is true)
-    if (av.glasses) {
-      ctx.strokeStyle = '#334155';
-      ctx.lineWidth = 1.2;
-      poly([[px - 5.5, eyeY - 2.5], [px - 1.2, eyeY - 2.5], [px - 1.5, eyeY + 2.4], [px - 5.2, eyeY + 2.4]], 'transparent', '#334155', 1.1);
-      poly([[px + 1.2, eyeY - 2.5], [px + 5.5, eyeY - 2.5], [px + 5.2, eyeY + 2.4], [px + 1.5, eyeY + 2.4]], 'transparent', '#334155', 1.1);
-      // Bridge
-      ctx.beginPath();
-      ctx.moveTo(px - 1.2, eyeY - 0.5);
-      ctx.lineTo(px + 1.2, eyeY - 0.5);
-      ctx.stroke();
-      // Glare reflection facet
-      if (!isAway) {
-        poly([[px - 4.8, eyeY - 1.8], [px - 3.2, eyeY - 1.8], [px - 2.4, eyeY + 0.8], [px - 3.8, eyeY + 0.8]], 'rgba(255, 255, 255, 0.55)');
-      }
-    }
-
-    // 7. Sculpted 3D Low-Poly Hairstyles with Faceted Lighting
-    const style = av.hair ?? 0;
-    const hLight = adjHex(hair, 32);
-    const hMid = adjHex(hair, 10);
-    const hDark = adjHex(hair, -25);
-
-    if (gender === 'F') {
-      if (style === 1) {
-        // Style 1: Low-Poly Cascading Waves
-        poly([[px - 8.5, hy - 4], [px, hy - 8.5], [px + 8.5, hy - 4], [px, hy - 1]], hLight);
-        poly([[px - 8.5, hy - 4], [px - 4, hy - 2], [px - 7, hy + 17], [px - 10.5, hy + 9]], hMid);
-        poly([[px + 4, hy - 2], [px + 8.5, hy - 4], [px + 10.5, hy + 9], [px + 7, hy + 17]], hDark);
-      } else if (style === 2) {
-        // Style 2: Low-Poly High Chignon / Top Bun
-        poly([[px - 8.5, hy - 4], [px, hy - 8], [px + 8.5, hy - 4], [px, hy - 1.5]], hMid);
-        // Faceted Top Bun
-        poly([[px - 4.5, hy - 9.5], [px, hy - 13.5], [px + 4.5, hy - 9.5], [px, hy - 7]], hLight);
-        poly([[px - 4.5, hy - 9.5], [px, hy - 7], [px + 4.5, hy - 9.5], [px, hy - 6]], hDark);
-        // Gold clip ring
-        poly([[px - 2.5, hy - 7], [px + 2.5, hy - 7], [px + 2.5, hy - 5.5], [px - 2.5, hy - 5.5]], '#eab308');
-      } else if (style === 3) {
-        // Style 3: Low-Poly Wavy Lob
-        poly([[px - 8.5, hy - 4], [px, hy - 8], [px + 8.5, hy - 4], [px, hy - 1.5]], hLight);
-        poly([[px - 8.5, hy - 4], [px - 5, hy - 1], [px - 8, hy + 11], [px - 10, hy + 4]], hMid);
-        poly([[px + 5, hy - 1], [px + 8.5, hy - 4], [px + 10, hy + 4], [px + 8, hy + 12]], hDark);
-      } else {
-        // Style 0 (Default): Low-Poly Parisian Bob with sharp fringe
-        poly([[px - 8.5, hy - 4], [px, hy - 8], [px + 8.5, hy - 4], [px, hy - 1.5]], hLight);
-        poly([[px - 8.5, hy - 4], [px - 4.5, hy - 1.5], [px - 7.5, hy + 8.5], [px - 9.5, hy + 3]], hMid);
-        poly([[px + 4.5, hy - 1.5], [px + 8.5, hy - 4], [px + 9.5, hy + 3], [px + 7.5, hy + 8.5]], hDark);
-      }
-    } else {
-      if (style === 1) {
-        // Style 1: Low-Poly Modern Textured Quiff
-        poly([[px - 8.5, hy - 3.5], [px, hy - 7], [px + 8.5, hy - 3.5], [px, hy - 1.5]], hMid);
-        // High faceted quiff crest
-        poly([[px - 5.5, hy - 4], [px - 1, hy - 12], [px + 4.5, hy - 8], [px + 1.5, hy - 3]], hLight);
-        poly([[px + 1.5, hy - 3], [px + 4.5, hy - 8], [px + 6.5, hy - 3.5]], hDark);
-      } else if (style === 2) {
-        // Style 2: Low-Poly K-Style Curtain Fringe
-        poly([[px - 8.5, hy - 3.5], [px, hy - 7.5], [px + 8.5, hy - 3.5], [px, hy - 2]], hLight);
-        // Parted curtain locks
-        poly([[px - 8, hy - 3], [px - 4, hy + 1.5], [px - 1.5, hy - 1], [px - 5, hy - 4]], hMid);
-        poly([[px + 1.5, hy - 1], [px + 4, hy + 1.5], [px + 8, hy - 3], [px + 5, hy - 4]], hDark);
-      } else if (style === 3) {
-        // Style 3: Low-Poly Clean Crop Fade
-        poly([[px - 8.5, hy - 3], [px, hy - 7], [px + 8.5, hy - 3], [px, hy - 1.5]], hLight);
-        poly([[px - 6.5, hy - 5], [px + 6.5, hy - 5], [px + 6.5, hy - 3], [px - 6.5, hy - 3]], hMid);
-        poly([[px - 8.5, hy - 3], [px - 6.5, hy - 1], [px - 8.5, hy + 2]], hDark);
-      } else {
-        // Style 0 (Default): Low-Poly Executive Side-Part Pompadour
-        poly([[px - 8.5, hy - 3.5], [px, hy - 7.5], [px + 8.5, hy - 3.5], [px, hy - 2]], hMid);
-        // Pompadour volume facet
-        poly([[px - 6.5, hy - 3.5], [px - 2, hy - 10], [px + 5.5, hy - 6.5], [px + 1, hy - 2]], hLight);
-        poly([[px + 1, hy - 2], [px + 5.5, hy - 6.5], [px + 7.5, hy - 2.5]], hDark);
-      }
-    }
-
-    // Specular Crown Facet Highlight
-    poly([[px - 4, hy - 5], [px, hy - 6.5], [px + 4, hy - 5], [px, hy - 4]], 'rgba(255, 255, 255, 0.28)');
-
-    // 8. 3D Faceted Leader Star / Crown Lapel Emblem
-    if (isLead) {
-      poly([[px, hy - 13.5], [px + 2, hy - 11], [px, hy - 8.5], [px - 2, hy - 11]], '#f59e0b');
-      poly([[px, hy - 12.5], [px + 1.2, hy - 11], [px, hy - 9.5], [px - 1.2, hy - 11]], '#fef08a');
-    }
-
-    ctx.restore();
-  }, [adjHex]);
 
   // Main Canvas Render Loop
   useEffect(() => {
@@ -1052,6 +585,7 @@ export const OfficeCanvas: React.FC<OfficeCanvasProps> = ({
       );
 
       hitsRef.current = [];
+      const zoneLabelHits: HitTarget[] = [];
 
       // 1. Base Building Floor with customizable Floor Texture
       const floorTex = db.settings.floorTexture || 'concrete';
@@ -1335,18 +869,34 @@ export const OfficeCanvas: React.FC<OfficeCanvasProps> = ({
           ctx.stroke();
           ctx.restore();
 
-          // Department Name etched onto isometric floor
+          // Department name etched onto the isometric floor
+          const label = z.name.toUpperCase();
+          const fontSize = Math.max(11, Math.min(18, z.w * 1.45));
           const ep = iso(z.x + 0.6, z.y + z.h - 0.35);
+          const nameHot = hoverTarget?.kind === 'zone' && hoverTarget.id === z.id;
           ctx.save();
           ctx.transform(1, 0.5, -1, 0.5, ep.x, ep.y);
-          ctx.font = `800 ${Math.max(11, Math.min(18, z.w * 1.45))}px "Plus Jakarta Sans", sans-serif`;
+          ctx.font = `800 ${fontSize}px "Plus Jakarta Sans", sans-serif`;
+          const textW = ctx.measureText(label).width;
           ctx.fillStyle = z.accent;
-          ctx.globalAlpha = isHl ? 0.75 : 0.45;
-          ctx.fillText(z.name.toUpperCase(), 0, 0);
+          ctx.globalAlpha = nameHot || isHl ? 0.92 : 0.45;
+          ctx.fillText(label, 0, 0);
           ctx.restore();
 
-          // Register floor hit
-          hitsRef.current.push({ kind: 'zone', id: z.id, x: z.x, y: z.y, w: z.w, h: z.h });
+          zoneLabelHits.push({
+            kind: 'zone',
+            id: z.id,
+            x: ep.x,
+            y: ep.y,
+            w: textW,
+            h: fontSize,
+            space: 'label',
+          });
+
+          drawTeamSections(ctx, iso, z, db);
+
+          // Floor is in world grid units — click anywhere on the pad to open details
+          hitsRef.current.push({ kind: 'zone', id: z.id, x: z.x, y: z.y, w: z.w, h: z.h, space: 'world' });
         }
       }
 
@@ -2393,8 +1943,9 @@ export const OfficeCanvas: React.FC<OfficeCanvasProps> = ({
       entities.sort((a, b) => a.depth - b.depth);
       for (const ent of entities) ent.draw();
 
-      // 6. Top layer: Zone Label Badges
+      // 6. Top layer: labels only for virtual rooms. Department names open from a floor click.
       for (const z of db.zones) {
+        if (!z.isVirtual) continue;
         const p = iso(z.x + z.w / 2, z.y);
         const text = `${z.icon} ${z.name}`;
         ctx.font = '700 11.5px "Plus Jakarta Sans", sans-serif';
@@ -2437,6 +1988,9 @@ export const OfficeCanvas: React.FC<OfficeCanvasProps> = ({
 
         hitsRef.current.push({ kind: 'zone', id: z.id, x, y, w, h: 24 });
       }
+
+      // Etched department names win over desks so hovering the letters opens the zone
+      for (const labelHit of zoneLabelHits) hitsRef.current.push(labelHit);
 
       // 7. Speech Bubbles
       const now = performance.now();
@@ -2548,13 +2102,29 @@ export const OfficeCanvas: React.FC<OfficeCanvasProps> = ({
 
     const hitAt = (mx: number, my: number): HitTarget | null => {
       const p = screenToIso(mx, my, cv.clientWidth, cv.clientHeight, camRef.current);
+      const world = unIso(p.x, p.y);
       for (let i = hitsRef.current.length - 1; i >= 0; i--) {
         const h = hitsRef.current[i];
         if (h.kind === 'virtualMeeting') {
           const isInsideScreen = mx >= h.x && mx <= h.x + h.w && my >= h.y && my <= h.y + h.h;
           const targetZ = db.zones.find(z => z.id === h.id);
-          const isInsideZone = targetZ && p.x >= targetZ.x && p.x <= targetZ.x + targetZ.w && p.y >= targetZ.y && p.y <= targetZ.y + targetZ.h;
+          const isInsideZone =
+            targetZ &&
+            world.x >= targetZ.x &&
+            world.x <= targetZ.x + targetZ.w &&
+            world.y >= targetZ.y &&
+            world.y <= targetZ.y + targetZ.h;
           if (isInsideScreen || isInsideZone) return h;
+        } else if (h.space === 'world') {
+          if (world.x >= h.x && world.x <= h.x + h.w && world.y >= h.y && world.y <= h.y + h.h) return h;
+        } else if (h.space === 'label') {
+          // Inverse of the floor text shear: (lx, ly) -> (lx - ly, 0.5*lx + 0.5*ly)
+          const dx = p.x - h.x;
+          const dy = p.y - h.y;
+          const lx = dx / 2 + dy;
+          const ly = dy - dx / 2;
+          const pad = 8;
+          if (lx >= -pad && lx <= h.w + pad && ly >= -h.h - pad && ly <= pad) return h;
         } else if (p.x >= h.x && p.x <= h.x + h.w && p.y >= h.y && p.y <= h.y + h.h) {
           return h;
         }
@@ -2617,7 +2187,7 @@ export const OfficeCanvas: React.FC<OfficeCanvasProps> = ({
       const h = hitAt(mx, my);
       setHoverTarget(h);
       if (h) {
-        setHoverPos({ x: mx, y: my });
+        setHoverPos({ x: ev.clientX, y: ev.clientY });
         cv.style.cursor = 'pointer';
       } else {
         cv.style.cursor = 'grab';
@@ -2696,7 +2266,7 @@ export const OfficeCanvas: React.FC<OfficeCanvasProps> = ({
       cv.removeEventListener('wheel', handleWheel);
       cv.removeEventListener('pointerleave', handlePointerLeave);
     };
-  }, [screenToIso, onSelectEmployee, onSelectZone, onSelectAgent, schedulerOpen, db.zones]);
+  }, [screenToIso, unIso, onSelectEmployee, onSelectZone, onSelectAgent, schedulerOpen, db.zones]);
 
   // Initial fit view
   useEffect(() => {
@@ -2846,7 +2416,7 @@ export const OfficeCanvas: React.FC<OfficeCanvasProps> = ({
               <b className="text-amber-400 text-sm">{stats.kpi || '–'}</b>
             </div>
           </div>
-          <div className="text-[10px] text-slate-400 pt-1 text-right">Bấm để xem danh sách & tổ →</div>
+          <div className="text-[10px] text-slate-400 pt-1 text-right">Bấm sàn để xem thông tin phòng ban →</div>
         </div>
       );
     } else if (kind === 'agent') {

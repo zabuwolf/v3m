@@ -22,9 +22,8 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ empId, onC
     status: (existing?.status || 'active') as Employee['status'],
     email: existing?.email || '',
     phone: existing?.phone || '',
-    salary: existing?.salary || 12000000,
+    salary: existing?.salary ?? 0,
     joinDate: existing?.joinDate || D.today(),
-    hair: existing?.avatar?.hair ?? 0,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -33,10 +32,6 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ empId, onC
       ...(existing || {}),
       ...formData,
       id: existing?.id,
-      avatar: {
-        ...(existing?.avatar || {}),
-        hair: Number(formData.hair),
-      },
     });
     onClose();
   };
@@ -109,7 +104,7 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ empId, onC
             </label>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <label className="space-y-1">
               <span className="text-slate-400 font-medium">Giới tính</span>
               <select
@@ -135,20 +130,6 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ empId, onC
                 <option value="probation">Thử việc</option>
                 <option value="leave">Nghỉ dài hạn</option>
                 <option value="resigned">Đã nghỉ</option>
-              </select>
-            </label>
-
-            <label className="space-y-1">
-              <span className="text-slate-400 font-medium">Kiểu tóc avatar</span>
-              <select
-                value={formData.hair}
-                onChange={e => setFormData({ ...formData, hair: Number(e.target.value) })}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-indigo-500"
-              >
-                <option value={0}>Ngắn / Tiêu chuẩn</option>
-                <option value={1}>Dài / Xoăn</option>
-                <option value={2}>Búi cao</option>
-                <option value={3}>Dựng / Phong cách</option>
               </select>
             </label>
           </div>

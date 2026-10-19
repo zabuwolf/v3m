@@ -812,7 +812,7 @@ export const TourOverlay: React.FC<TourOverlayProps> = ({
 
       {/* Bottom Main Presentation Card */}
       <div className="pointer-events-auto max-w-2xl w-full mx-auto p-4 mb-2">
-        <div className="bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-3xl p-5 shadow-2xl text-slate-100 transition-all duration-300">
+        <div className="bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-2xl p-5 shadow-2xl text-slate-100 transition-all duration-300">
           {renderCardContent()}
         </div>
       </div>

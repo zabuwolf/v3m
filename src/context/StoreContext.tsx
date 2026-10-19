@@ -25,7 +25,8 @@ import {
 import { D } from '../utils/date';
 import { N } from '../utils/format';
 
-const LS_KEY = 'v3m-hr-db-react';
+const LS_KEY = 'v3m-hr-db-vic';
+const SESSION_KEY = 'v3m-session-emp';
 
 export interface ToastItem {
   id: string;
@@ -102,6 +103,7 @@ interface StoreContextValue {
   // Meetings & Virtual Meeting Zones
   empMeetings: (empId: string) => MeetingItem[];
   addMeeting: (meeting: Omit<MeetingItem, 'id'>) => void;
+  updateMeeting: (id: string, patch: Partial<Pick<MeetingItem, 'title' | 'notes' | 'room' | 'time'>>) => void;
   deleteMeeting: (meetingId: string) => void;
   toggleMeetingAttendance: (meetingId: string, empId: string) => void;
   createVirtualMeetingZone: (
@@ -123,6 +125,7 @@ interface StoreContextValue {
   // Support Tickets
   addSupportTicket: (ticket: Omit<SupportTicket, 'id' | 'createdAt' | 'status'>) => void;
   resolveSupportTicket: (id: string) => void;
+  setSupportStatus: (id: string, status: SupportTicket['status']) => void;
 
   updateCompany: (c: Partial<Company>) => void;
   updateRules: (r: Partial<Rules>) => void;
@@ -132,6 +135,10 @@ interface StoreContextValue {
   resetData: () => void;
   importJSON: (data: Database) => void;
   exportJSON: () => void;
+
+  sessionEmpId: string | null;
+  login: (empId: string) => void;
+  logout: () => void;
 }
 
 export function generateInitialMeetings(employees: Employee[], zones: Zone[]): MeetingItem[] {
@@ -213,9 +220,10 @@ export function generateInitialMeetings(employees: Employee[], zones: Zone[]): M
     const deptEmps = activeEmps.filter(e => e.dept === dept);
     if (deptEmps.length === 0) return;
     const room = deptRoomMap[dept] || 'Phòng họp đa năng';
+    const zoneName = zones.find(z => z.id === dept)?.name || 'phòng ban';
     const templates = deptMeetingTemplates[dept] || [
-      { title: `Họp triển khai công việc phòng ${dept}`, type: 'internal', notes: 'Thảo luận kế hoạch thực hiện tuần mới.' },
-      { title: `Đánh giá tiến độ dự án phòng ${dept}`, type: 'review', notes: 'Rà soát các mốc tiến độ quan trọng.' },
+      { title: `Họp triển khai công việc · ${zoneName}`, type: 'internal' as const, notes: 'Thảo luận kế hoạch thực hiện tuần mới.' },
+      { title: `Đánh giá tiến độ dự án · ${zoneName}`, type: 'review' as const, notes: 'Rà soát các mốc tiến độ quan trọng.' },
     ];
 
     templates.forEach((tmpl, tIdx) => {
@@ -253,14 +261,37 @@ export function generateInitialMeetings(employees: Employee[], zones: Zone[]): M
   return list;
 }
 
+const DESK_LAYOUT = 'team-sections-1';
+const LEADER_ROLE = /trưởng|leader|founder|giám đốc|\bceo\b|\bcoo\b|\bcto\b|\bcfo\b|quản lý|điều hành/i;
+
+function teamSortKey(name: string) {
+  if (/leader|trưởng|sáng lập/i.test(name)) return `0-${name}`;
+  return `1-${name}`;
+}
+
 export function assignDefaultDesks(database: Database, force = false): Database {
+  const regroup = force || database.settings?.deskLayout !== DESK_LAYOUT;
+  let teams = database.teams.map(t => ({ ...t }));
   const nextEmps = database.employees.map(e => ({ ...e }));
-  
+
   // 1. Ensure every employee has a valid dept
   for (const e of nextEmps) {
     if (!e.dept || !database.zones.some(z => z.id === e.dept)) {
-      const t = database.teams.find(t => t.id === e.team);
+      const t = teams.find(tm => tm.id === e.team);
       e.dept = t ? t.dept : (database.zones[0]?.id || 'nhan-su');
+    }
+  }
+
+  // Split leaders into their own section inside each department.
+  if (regroup) {
+    for (const e of nextEmps) {
+      if (e.status === 'resigned' || !e.dept || e.dept === 'founder' || e.dept === 'nghi') continue;
+      if (!LEADER_ROLE.test(e.role || '')) continue;
+      const id = `${e.dept}-leader`;
+      if (!teams.some(t => t.id === id)) {
+        teams.push({ id, dept: e.dept, name: 'Leader', color: '#d8a21a' });
+      }
+      e.team = id;
     }
   }
 
@@ -288,30 +319,64 @@ export function assignDefaultDesks(database: Database, force = false): Database 
 
     const used = new Set<string>();
     const deptEmps = nextEmps.filter(e => e.dept === z.id && e.status !== 'resigned');
+    deptEmps.sort((a, b) => {
+      const an = teams.find(t => t.id === a.team)?.name || a.team || '';
+      const bn = teams.find(t => t.id === b.team)?.name || b.team || '';
+      const byTeam = teamSortKey(an).localeCompare(teamSortKey(bn), 'vi');
+      if (byTeam) return byTeam;
+      return a.name.localeCompare(b.name, 'vi');
+    });
 
-    if (!force) {
+    if (!regroup) {
       for (const e of deptEmps) {
-        if (inZone(e.desk)) {
-          used.add(`${e.desk!.x.toFixed(1)},${e.desk!.y.toFixed(1)}`);
-        }
+        if (inZone(e.desk)) used.add(`${e.desk!.x.toFixed(1)},${e.desk!.y.toFixed(1)}`);
       }
     }
 
-    const free = () => slots.find(s => !used.has(`${s.x.toFixed(1)},${s.y.toFixed(1)}`));
+    let row = 0;
+    let col = 0;
+    let prevTeam = '';
+
+    const takeSlot = (e: (typeof deptEmps)[number], index: number) => {
+      const key = (x: number, y: number) => `${x.toFixed(1)},${y.toFixed(1)}`;
+      if (row < rows && col < cols) {
+        const x = z.x + 1.2 + col * 2;
+        const y = z.y + 1.2 + row * 2;
+        if (!used.has(key(x, y))) {
+          e.desk = { x, y };
+          used.add(key(x, y));
+          col += 1;
+          if (col >= cols) {
+            col = 0;
+            row += 1;
+          }
+          return;
+        }
+      }
+      const free = slots.find(s => !used.has(key(s.x, s.y)));
+      if (free) {
+        e.desk = free;
+        used.add(key(free.x, free.y));
+        return;
+      }
+      const fc = (index % Math.max(1, Math.floor(z.w - 2))) + 1;
+      const fr = (Math.floor(index / Math.max(1, Math.floor(z.w - 2))) % Math.max(1, Math.floor(z.h - 2))) + 1;
+      e.desk = { x: z.x + fc, y: z.y + fr };
+    };
 
     for (let i = 0; i < deptEmps.length; i++) {
       const e = deptEmps[i];
-      if (!force && inZone(e.desk)) continue;
-      const s = free();
-      if (!s) {
-        // Fallback grid placement if slots are full
-        const fc = (i % Math.max(1, Math.floor(z.w - 2))) + 1;
-        const fr = (Math.floor(i / Math.max(1, Math.floor(z.w - 2))) % Math.max(1, Math.floor(z.h - 2))) + 1;
-        e.desk = { x: z.x + fc, y: z.y + fr };
-      } else {
-        e.desk = { x: s.x, y: s.y };
-        used.add(`${s.x.toFixed(1)},${s.y.toFixed(1)}`);
+      if (!regroup && inZone(e.desk)) continue;
+      if (regroup && prevTeam && e.team !== prevTeam && col > 0) {
+        const remaining = cols - col;
+        const ahead = deptEmps.slice(i).filter(x => x.team === e.team).length;
+        if (ahead > remaining) {
+          col = 0;
+          row += 1;
+        }
       }
+      prevTeam = e.team || '';
+      takeSlot(e, i);
     }
   }
 
@@ -401,7 +466,15 @@ export function assignDefaultDesks(database: Database, force = false): Database 
     ];
   }
 
-  return { ...database, employees: nextEmps, zones, meetings, supportTickets };
+  return {
+    ...database,
+    employees: nextEmps,
+    teams,
+    settings: { ...database.settings, deskLayout: DESK_LAYOUT },
+    zones,
+    meetings,
+    supportTickets,
+  };
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null);
@@ -427,6 +500,24 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     return assignDefaultDesks(initial, false);
   });
+
+  const [sessionEmpId, setSessionEmpId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(SESSION_KEY);
+    } catch {
+      return null;
+    }
+  });
+
+  const login = useCallback((empId: string) => {
+    localStorage.setItem(SESSION_KEY, empId);
+    setSessionEmpId(empId);
+  }, []);
+
+  const logout = useCallback(() => {
+    localStorage.removeItem(SESSION_KEY);
+    setSessionEmpId(null);
+  }, []);
 
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [savedFlash, setSavedFlash] = useState(false);
@@ -1155,6 +1246,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     addToast(`Đã ghi nhận cuộc họp "${meeting.title}"`, 'success');
   }, [addToast]);
 
+  const updateMeeting = useCallback((id: string, patch: Partial<Pick<MeetingItem, 'title' | 'notes' | 'room' | 'time'>>) => {
+    setDb(prev => ({
+      ...prev,
+      meetings: (prev.meetings || []).map(m => (m.id === id ? { ...m, ...patch } : m)),
+    }));
+    addToast('Đã lưu tiêu đề và tóm tắt cuộc họp', 'success');
+  }, [addToast]);
+
   const deleteMeeting = useCallback((meetingId: string) => {
     setDb(prev => {
       const nextMeetings = (prev.meetings || []).filter(m => m.id !== meetingId);
@@ -1299,17 +1398,31 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     [addToast]
   );
 
-  const resolveSupportTicket = useCallback(
-    (id: string) => {
+  const setSupportStatus = useCallback(
+    (id: string, status: SupportTicket['status']) => {
       setDb(prev => ({
         ...prev,
         supportTickets: (prev.supportTickets || []).map(t =>
-          t.id === id ? { ...t, status: 'resolved' as const } : t
+          t.id === id ? { ...t, status } : t
         ),
       }));
-      addToast('Đã đánh dấu xử lý xong yêu cầu hỗ trợ', 'success');
+      addToast(
+        status === 'resolved'
+          ? 'Đã đóng yêu cầu hỗ trợ'
+          : status === 'in-progress'
+          ? 'Đã nhận xử lý yêu cầu'
+          : 'Đã chuyển yêu cầu về hàng chờ',
+        'success'
+      );
     },
     [addToast]
+  );
+
+  const resolveSupportTicket = useCallback(
+    (id: string) => {
+      setSupportStatus(id, 'resolved');
+    },
+    [setSupportStatus]
   );
 
   // Company / Settings / Rules
@@ -1408,12 +1521,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     deleteVisitor,
     empMeetings,
     addMeeting,
+    updateMeeting,
     deleteMeeting,
     toggleMeetingAttendance,
     createVirtualMeetingZone,
     deleteVirtualMeetingZone,
     addSupportTicket,
     resolveSupportTicket,
+    setSupportStatus,
     updateCompany,
     updateRules,
     updateSettings,
@@ -1421,6 +1536,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     resetData,
     importJSON,
     exportJSON,
+    sessionEmpId,
+    login,
+    logout,
   };
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

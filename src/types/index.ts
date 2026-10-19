@@ -16,6 +16,7 @@ export interface Settings {
   slideSeconds: number;
   slideshowAt: string;
   music?: boolean;
+  deskLayout?: string;
 }
 
 export interface Zone {
@@ -53,6 +54,8 @@ export interface Avatar {
   hair?: number;
   hairColor?: string;
   glasses?: boolean;
+  /** Set after the employee picks a look on their first login. */
+  chosen?: boolean;
 }
 
 export interface DeskPosition {
@@ -69,10 +72,17 @@ export interface Employee {
   team: string;
   gender: 'M' | 'F';
   email?: string;
+  vicEmail?: string;
   phone?: string;
   dob?: string;
   joinDate?: string;
+  officialDate?: string;
   salary?: number;
+  alias?: string;
+  sku?: string;
+  employmentType?: string;
+  photo?: string;
+  note?: string;
   desk?: DeskPosition | null;
   avatar?: Avatar;
   status: 'active' | 'probation' | 'leave' | 'resigned';
@@ -245,10 +255,14 @@ export type ViewTab = 'office' | 'manage' | 'reports';
 export type ManageTab =
   | 'dashboard'
   | 'employees'
+  | 'org'
+  | 'payroll'
   | 'teams'
   | 'attendance'
   | 'leaves'
   | 'tasks'
+  | 'meetings'
   | 'candidates'
   | 'visitors'
+  | 'support'
   | 'data';

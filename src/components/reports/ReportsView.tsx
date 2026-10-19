@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { D } from '../../utils/date';
-import { N } from '../../utils/format';
+import { N, esc } from '../../utils/format';
+import { printHtml } from '../../utils/printHtml';
 import {
   Trophy,
   Play,
   TrendingUp,
   AlertTriangle,
   Award,
-  Users,
-  CheckCircle2,
-  Clock,
+  FileDown,
 } from 'lucide-react';
 
 interface ReportsViewProps {
@@ -58,29 +57,25 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const maxWorking = Math.max(1, ...trend.map(t => t.working), activeEmps().length);
 
   return (
-    <div className="h-[calc(100vh-56px)] bg-slate-950 overflow-y-auto p-6 text-slate-100">
+    <div className="v3m-workspace h-[calc(100vh-56px)] overflow-y-auto p-6 text-slate-100">
       <div className="max-w-6xl mx-auto space-y-6">
-        {/* Header with period selector & tour launcher */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-black text-white tracking-tight">
-              Báo cáo hiệu suất & Vinh danh
-            </h1>
-            <p className="text-xs text-slate-400">
-              {range.label} ({range.sub}) · Tổng hợp dữ liệu chấm công, xếp hạng tổ và đánh giá KPI
+            <div className="v3m-kicker">Hiệu suất</div>
+            <h1 className="text-2xl font-semibold text-white mt-1">Báo cáo & vinh danh</h1>
+            <p className="text-xs text-slate-400 mt-1">
+              {range.label} ({range.sub}) · Chấm công, xếp hạng tổ và KPI
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="flex bg-slate-900 border border-slate-800 p-1 rounded-2xl">
+            <div className="flex bg-black/30 border border-white/10 p-1 rounded-xl">
               {(['today', 'yesterday', 'week', 'month'] as const).map(p => (
                 <button
                   key={p}
                   onClick={() => setPeriod(p)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
-                    period === p
-                      ? 'bg-indigo-600 text-white shadow'
-                      : 'text-slate-400 hover:text-white'
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition ${
+                    period === p ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   {D.range(p).label}
@@ -89,17 +84,59 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             </div>
 
             <button
+              onClick={() => {
+                const rows = rk
+                  .map(
+                    (x, i) =>
+                      `<tr><td>${i + 1}</td><td>${esc(x.team.name)}</td><td>${esc(zone(x.team.dept)?.name || '')}</td><td>${x.stats.headcount}</td><td>${x.stats.working}</td><td>${x.stats.late}</td><td>${x.stats.tasksDone}/${x.stats.tasksAssigned}</td><td>${x.stats.kpi}</td></tr>`,
+                  )
+                  .join('');
+                const people = profiles(6)
+                  .map(
+                    (item, i) =>
+                      `<tr><td>${i + 1}</td><td>${esc(item.emp.name)}</td><td>${esc(item.emp.role)}</td><td>${item.stats.kpi}</td><td>${esc(N.pctS(item.stats.attendanceRate))}</td><td>${esc(N.pctS(item.stats.taskRate))}</td></tr>`,
+                  )
+                  .join('');
+                printHtml(
+                  `Bao cao ${range.label}`,
+                  `
+                    <p class="muted">${esc(db.company.name)}</p>
+                    <h1>Báo cáo hiệu suất · ${esc(range.label)}</h1>
+                    <p>${esc(range.sub)}</p>
+                    <div class="kpi">
+                      <div><span class="muted">Có mặt</span><b>${ov.working}/${ov.headcount}</b></div>
+                      <div><span class="muted">Việc xong</span><b>${ov.tasksDone}/${ov.tasksAssigned}</b></div>
+                      <div><span class="muted">KPI trung bình</span><b>${ov.kpi || '–'}</b></div>
+                      <div><span class="muted">Đi muộn</span><b>${ov.late}</b></div>
+                      <div><span class="muted">Tăng ca</span><b>${ov.overtime}h</b></div>
+                    </div>
+                    ${ch ? `<h2>Quán quân: ${esc(ch.team.name)}</h2><p>KPI ${ch.stats.kpi} · Việc ${ch.stats.tasksDone} · Chuyên cần ${esc(N.pctS(ch.stats.attendanceRate))}</p><p>Gương mặt: ${esc(ch.people.map(p => shortName(p.emp)).join(', '))}</p>` : ''}
+                    <h2>Xếp hạng tổ</h2>
+                    <table><thead><tr><th>#</th><th>Tổ</th><th>Phòng</th><th>Người</th><th>Có mặt</th><th>Muộn</th><th>Việc</th><th>KPI</th></tr></thead><tbody>${rows}</tbody></table>
+                    <h2>Nhân sự nổi bật 90 ngày</h2>
+                    <table><thead><tr><th>#</th><th>Họ tên</th><th>Vai trò</th><th>KPI</th><th>Chuyên cần</th><th>Việc</th></tr></thead><tbody>${people}</tbody></table>
+                  `,
+                );
+              }}
+              title="Mở hộp thoại in, chọn Lưu thành PDF"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-white/15 text-white text-xs font-semibold hover:bg-white/8 transition"
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              <span>Xuất PDF</span>
+            </button>
+
+            <button
               onClick={onStartTour}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition transform active:scale-95"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white text-slate-950 text-xs font-semibold hover:bg-slate-100 transition"
             >
               <Play className="w-3.5 h-3.5 fill-current" />
-              <span>Trình chiếu 3D</span>
+              <span>Trình chiếu</span>
             </button>
           </div>
         </div>
 
         {/* Top Cards: Overview & Champion */}
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {/* Overview Card */}
           <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
@@ -196,7 +233,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
         {/* Podium and Lowest Performing analysis */}
         {rk.length >= 2 && (
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             {/* Podium */}
             <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 space-y-4">
               <span className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider block border-b border-slate-800 pb-2">
@@ -388,7 +425,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             <span>Top nhân sự xuất sắc 90 ngày</span>
           </h3>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {profiles(6).map((item, idx) => (
               <div
                 key={item.emp.id}

@@ -1,28 +1,209 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 @layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
   body {
     margin: 0;
     padding: 0;
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background-color: #020617;
+    font-family: var(--font-sans);
+    background: #070b14;
     color: #f8fafc;
     overflow: hidden;
+    font-feature-settings: "ss01" on, "cv11" on;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  #root {
+    position: relative;
+    z-index: 1;
+  }
+
+  ::selection {
+    background: rgba(99, 102, 241, 0.85);
+    color: white;
   }
 }
 
-/* Custom scrollbars */
+/* Atmosphere sits behind the app, never over the 3D canvas. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(900px 420px at 12% -10%, rgba(99, 102, 241, 0.22), transparent 60%),
+    radial-gradient(700px 380px at 100% 0%, rgba(14, 165, 233, 0.1), transparent 55%),
+    radial-gradient(640px 360px at 80% 110%, rgba(245, 158, 11, 0.06), transparent 50%),
+    #070b14;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.45;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse at 50% 0%, #000 20%, transparent 72%);
+}
+
+/* Surfaces used across management, reports, drawers and dialogs. */
+.v3m-app .bg-slate-900\/90,
+.v3m-app .bg-slate-900\/95 {
+  background-color: rgba(12, 18, 32, 0.82);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 38%);
+  backdrop-filter: blur(18px);
+}
+
+.v3m-app :is(.border-slate-800, .border-slate-700, .border-slate-700\/80, .border-slate-800\/80):is(.rounded-xl, .rounded-2xl, .rounded-3xl) {
+  border-color: rgba(148, 163, 184, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    0 18px 40px -28px rgba(0, 0, 0, 0.9);
+}
+
+.v3m-app .fixed.inset-0.z-50 {
+  background: rgba(4, 7, 16, 0.72);
+  backdrop-filter: blur(12px) saturate(1.15);
+}
+
+.v3m-app .fixed.inset-0.z-50 > .rounded-3xl,
+.v3m-app .fixed.inset-0.z-40 > .rounded-3xl {
+  background-color: rgba(13, 19, 34, 0.94);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 26%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 30px 80px rgba(0, 0, 0, 0.55);
+}
+
+.v3m-app h1,
+.v3m-app h2,
+.v3m-app h3 {
+  letter-spacing: -0.03em;
+}
+
+.v3m-app b,
+.v3m-app .font-mono {
+  font-variant-numeric: tabular-nums;
+}
+
+.v3m-app table thead th {
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  font-weight: 650;
+  font-size: 10px;
+}
+
+.v3m-app table tbody tr {
+  transition: background-color 160ms ease;
+}
+
+.v3m-app :is(input, select, textarea) {
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.v3m-app :is(input, select, textarea):focus {
+  outline: none;
+  border-color: rgba(129, 140, 248, 0.9);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.22);
+}
+
+.v3m-app select option {
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.v3m-app button:focus-visible,
+.v3m-app a:focus-visible {
+  outline: 2px solid rgba(129, 140, 248, 0.85);
+  outline-offset: 2px;
+}
+
+.v3m-kicker {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #818cf8;
+}
+
+.v3m-workspace {
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.35), transparent 180px),
+    transparent;
+}
+
+.animate-fadeIn {
+  animation: v3m-fade 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-slideUp {
+  animation: v3m-slide 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes v3m-fade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes v3m-slide {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
+
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+  background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
-  background: rgba(71, 85, 105, 0.6);
-  border-radius: 3px;
+  background: rgba(100, 116, 139, 0.45);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 99px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.8);
+  background: rgba(148, 163, 184, 0.7);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fadeIn,
+  .animate-slideUp {
+    animation: none;
+  }
 }

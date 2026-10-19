@@ -241,9 +241,18 @@ export const EmployeeModal: React.FC<EmployeeModalProps> = ({
                 {e.role} · <span style={{ color: eTeam?.color }}>{eTeam?.name}</span> · {z?.name}
               </p>
               <div className="text-xs text-slate-500 mt-0.5">
-                {e.email || 'email@company.vn'} · {e.phone || '0988 123 456'} · Vào làm:{' '}
+                {e.alias ? `${e.alias} · ` : ''}
+                {e.email || e.vicEmail || 'Chưa có email'} · {e.phone || 'Chưa có số'} · Vào làm:{' '}
                 {D.fmtFull(e.joinDate || '')}
+                {e.employmentType ? ` · ${e.employmentType}` : ''}
               </div>
+              {(e.vicEmail || e.officialDate || e.sku) && (
+                <div className="text-[11px] text-slate-500 mt-0.5">
+                  {e.vicEmail ? `Mail VIC: ${e.vicEmail}` : ''}
+                  {e.officialDate ? ` · Chính thức: ${D.fmtFull(e.officialDate)}` : ''}
+                  {e.sku ? ` · ${e.sku}` : ''}
+                </div>
+              )}
             </div>
           </div>
 

@@ -20,7 +20,11 @@ export const ZoneModal: React.FC<ZoneModalProps> = ({
   if (!z) return null;
 
   const s = deptStats(z.id, 'today');
-  const teams = teamsOf(z.id);
+  const teams = [...teamsOf(z.id)].sort(
+    (a, b) =>
+      (/leader|trưởng|sáng lập/i.test(a.name) ? 0 : 1) - (/leader|trưởng|sáng lập/i.test(b.name) ? 0 : 1) ||
+      a.name.localeCompare(b.name, 'vi'),
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">

@@ -16,11 +16,13 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({ onClose, onFocusTeam }
     reminderTeams,
     teamWarnings,
     setLeaveStatus,
+    resolveSupportTicket,
   } = useStore();
 
   const red = redTeams();
   const rem = reminderTeams();
   const pendingLeaves = db.leaves.filter(l => l.status === 'pending');
+  const openTickets = (db.supportTickets || []).filter(t => t.status !== 'resolved');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
@@ -31,7 +33,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({ onClose, onFocusTeam }
             <div>
               <h2 className="text-lg font-bold text-white">Cần xử lý & Cảnh báo</h2>
               <div className="text-xs text-slate-400">
-                {red.length} nháy đỏ · {rem.length} nhắc nhở · {pendingLeaves.length} đơn nghỉ chờ duyệt
+                {red.length} nháy đỏ · {rem.length} nhắc nhở · {pendingLeaves.length} đơn nghỉ · {openTickets.length} hỗ trợ
               </div>
             </div>
           </div>
@@ -156,7 +158,36 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({ onClose, onFocusTeam }
           </div>
         )}
 
-        {red.length === 0 && rem.length === 0 && pendingLeaves.length === 0 && (
+        {openTickets.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-xs font-bold text-sky-300 uppercase tracking-wide">
+              Yêu cầu hỗ trợ đang mở ({openTickets.length})
+            </h3>
+            <div className="space-y-2">
+              {openTickets.slice(0, 5).map(t => (
+                <div
+                  key={t.id}
+                  className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800 flex items-center justify-between gap-3 text-xs"
+                >
+                  <div className="min-w-0">
+                    <b className="text-white text-sm block truncate">{t.title}</b>
+                    <div className="text-slate-400 truncate">
+                      {emp(t.empId)?.name || 'Nhân viên'} · {t.assignee || 'Chưa gán'}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => resolveSupportTicket(t.id)}
+                    className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shrink-0"
+                  >
+                    Đóng
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {red.length === 0 && rem.length === 0 && pendingLeaves.length === 0 && openTickets.length === 0 && (
           <div className="py-8 text-center text-emerald-400 font-semibold text-sm">
             ✓ Hiện tại không có vấn đề nào cần xử lý!
           </div>
